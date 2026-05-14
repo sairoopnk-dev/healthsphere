@@ -1,0 +1,53 @@
+useState, useEffect } from "react";
+useState("Overview");
+useState<any>({ name:"Loading...", id:"...", bloodGroup:"-", dob:"", gender:"-", email:"...", contactNumber:"-", address: "...", emergencyContact: { name: "...", phone: "..." } });
+useState<any[]>([]);
+useState<any[]>([]);
+useState(false);
+  const [appointments,  setAppointments]    = useState<any[]>([]);
+useState(false);
+useState(false);
+useState(false);
+useState(false);
+useState<any>(null);
+useState<string | null>(null);
+useState<string | null>(null);
+useState<string | null>(null);
+useState(1);
+useState("");
+useState("");
+useState("");
+useState<{label:string;day:number}|null>(null);
+useState<number[]>([]);
+useState<any[]>([]);
+useState<any>(null);
+useState("");
+useState<string[]>([]);
+useState("");
+useState(false);
+useState("");
+useState(false);
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState("");
+useState(false);
+useEffect(() => {
+          setAppointments(data.filter((a: any) => a.patientName === userName));
+      // Add locally to Appointments state
+      setAppointments(prev => [{
+    { name:"Appointments",   icon:CalendarIcon },
+            {activeTab === "Appointments" && <CalendarIcon size={28} className="text-teal-500" />}
+                {/* QR + Appointments mini split */}
+                  {/* Appointments preview */}
+                      <h3 className="text-xl font-bold text-slate-800">Appointments</h3>
+          {activeTab === "Appointments" && (
+                <h3 className="text-2xl font-bold text-slate-800">My Appointments</h3>
