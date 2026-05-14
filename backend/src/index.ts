@@ -42,6 +42,7 @@ import voiceBookingRoutes  from './routes/voiceBookingRoutes';
 import placesProxyRoutes   from './routes/placesProxyRoutes';
 import hospitalRoutes      from './routes/hospitalRoutes';
 import deluluRoutes        from './routes/deluluRoutes';
+import symptomCheckerRoutes from './routes/symptomCheckerRoutes';
 
 app.use('/api/auth',            authRoutes);
 app.use('/api/patients',        patientRoutes);
@@ -57,6 +58,7 @@ app.use('/api/voice-booking',   voiceBookingRoutes);
 app.use('/api/places',          placesProxyRoutes);
 app.use('/api/hospital',        hospitalRoutes);
 app.use('/api/delulu',          deluluRoutes);
+app.use('/api/symptom-checker', symptomCheckerRoutes);
 
 const PORT = process.env.PORT || 5000;
 
