@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, HeartHandshake, Sparkles, SmilePlus, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { Send, HeartHandshake, Sparkles, SmilePlus, RefreshCw, Activity, Mic, MicOff, Volume2 } from "lucide-react";
 import { usePatient } from "../_context/PatientContext";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+/* ── Voice Types ─────────────────────────────────────────────────────────── */
+type InputMode = "text" | "voice";
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 type MoodTag = "positive" | "neutral" | "negative";
@@ -19,18 +31,17 @@ interface ChatMessage {
 const API = "http://localhost:8000";
 
 const SUGGESTED_PROMPTS = [
-  "I feel stressed today",
+  "I feel stressed",
+  "I feel better",
+  "I need help",
   "I'm feeling anxious",
-  "I had a really bad day",
-  "I'm feeling lonely",
-  "I can't sleep well",
-  "I feel overwhelmed",
+  "I had a bad day",
 ];
 
-const MOOD_CONFIG: Record<MoodTag, { color: string; bg: string; label: string; emoji: string }> = {
-  positive: { color: "text-emerald-600", bg: "bg-emerald-50", label: "Positive", emoji: "😊" },
-  neutral:  { color: "text-slate-500",   bg: "bg-slate-50",   label: "Neutral",  emoji: "😐" },
-  negative: { color: "text-rose-500",    bg: "bg-rose-50",    label: "Low",      emoji: "😔" },
+const MOOD_CONFIG: Record<MoodTag, { color: string; bg: string; label: string }> = {
+  positive: { color: "text-emerald-600", bg: "bg-emerald-50", label: "Positive" },
+  neutral:  { color: "text-slate-500",   bg: "bg-slate-50",   label: "Neutral" },
+  negative: { color: "text-rose-500",    bg: "bg-rose-50",    label: "Low" },
 };
 
 /* ── Wellness Ring ─────────────────────────────────────────────────────── */
@@ -88,14 +99,17 @@ function WellnessRing({ score }: { score: number }) {
 /* ── Typing indicator ──────────────────────────────────────────────────── */
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-4 py-3">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="w-2 h-2 rounded-full bg-violet-400 animate-bounce"
-          style={{ animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-2 h-2 rounded-full bg-violet-400 animate-bounce"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+      <span className="text-xs text-slate-400 font-medium animate-pulse">Delulu is typing...</span>
     </div>
   );
 }
@@ -129,7 +143,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           <span className="text-[10px] text-slate-400">{time}</span>
           {!isBot && msg.moodTag && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${moodCfg.bg} ${moodCfg.color}`}>
-              {moodCfg.emoji} {moodCfg.label}
+              {moodCfg.label}
             </span>
           )}
         </div>
@@ -155,8 +169,38 @@ export default function DeluluPage() {
   const [wellnessScore, setWellnessScore] = useState(70);
   const [moodStreak, setMoodStreak] = useState<MoodTag[]>([]);
 
+  /* ── Voice state ── */
+  const [isListening, setIsListening]   = useState(false);
+  const [isSpeaking, setIsSpeaking]     = useState(false);
+  const [micError, setMicError]         = useState("");
+  const inputModeRef                     = useRef<InputMode>("text");
+  const recognitionRef                   = useRef<SpeechRecognition | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  /* ── speak() — TTS ── */
+  const speak = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, "").trim();
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.lang  = "en-US";
+    utt.rate  = 1;
+    utt.pitch = 1;
+    utt.onstart = () => setIsSpeaking(true);
+    utt.onend   = () => setIsSpeaking(false);
+    utt.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utt);
+  }, []);
+
+  /* ── stopSpeaking() ── */
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
 
   /* Auto-scroll */
   const scrollBottom = useCallback(() => {
@@ -188,9 +232,13 @@ export default function DeluluPage() {
 
   /* Send message */
   const handleSend = useCallback(
-    async (text?: string) => {
+    async (text?: string, mode?: InputMode) => {
       const msg = (text || input).trim();
       if (!msg || loading || !userId || userId === "...") return;
+
+      const effectiveMode = mode ?? inputModeRef.current;
+      // Reset to text after each voice send
+      inputModeRef.current = "text";
 
       const optimistic: ChatMessage = {
         role: "user",
@@ -209,8 +257,10 @@ export default function DeluluPage() {
           body: JSON.stringify({ userId, message: msg }),
         });
         const data = await res.json();
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
         if (data.success) {
-          // Update the optimistic message with real moodTag
           setMessages((prev) => [
             ...prev.slice(0, -1),
             { ...optimistic, moodTag: data.moodTag },
@@ -223,6 +273,10 @@ export default function DeluluPage() {
           ]);
           setWellnessScore(data.wellnessScore ?? wellnessScore);
           setMoodStreak((prev) => [...prev.slice(-6), data.moodTag]);
+          // ── Conditional output ──
+          if (effectiveMode === "voice") {
+            speak(data.reply);
+          }
         }
       } catch {
         setMessages((prev) => [
@@ -230,7 +284,7 @@ export default function DeluluPage() {
           { ...optimistic },
           {
             role: "bot",
-            content: "I'm having a little moment. Please try again in a bit 💜",
+            content: "I'm having a little moment 😓 Please try again in a bit.",
             moodTag: "neutral",
             timestamp: new Date().toISOString(),
           },
@@ -240,8 +294,44 @@ export default function DeluluPage() {
         inputRef.current?.focus();
       }
     },
-    [input, loading, userId, wellnessScore],
+    [input, loading, userId, wellnessScore, speak],
   );
+
+  /* ── startListening() — STT ── */
+  const startListening = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setMicError("Speech recognition not supported in this browser.");
+      return;
+    }
+    stopSpeaking();
+    setMicError("");
+
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    recognitionRef.current = rec;
+
+    rec.onstart  = () => setIsListening(true);
+    rec.onend    = () => setIsListening(false);
+    rec.onerror  = (e) => {
+      setIsListening(false);
+      if (e.error === "not-allowed" || e.error === "denied") {
+        setMicError("Microphone permission denied. Using text input.");
+      } else if (e.error !== "aborted") {
+        setMicError("Couldn't catch that — please try again.");
+      }
+    };
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      inputModeRef.current = "voice";
+      handleSend(transcript, "voice");
+    };
+
+    try { rec.start(); } catch { setMicError("Could not start mic."); }
+  }, [handleSend, stopSpeaking]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -256,8 +346,33 @@ export default function DeluluPage() {
   /* Mood bar from recent streak */
   const moodBarItems = moodStreak.slice(-7);
 
+  const currentMood = moodStreak.length > 0 ? moodStreak[moodStreak.length - 1] : "neutral";
+
+  const getMoodStyle = (mood: MoodTag) => {
+    if (mood === "negative") return { filter: "saturate(0.85) opacity(0.96)", backgroundColor: "rgba(248, 250, 252, 0.6)" }; // pale look (slate-50)
+    if (mood === "positive") return { filter: "saturate(1.05)", backgroundColor: "rgba(236, 253, 245, 0.4)" }; // slight warmth (emerald-50)
+    return { filter: "saturate(1)", backgroundColor: "transparent" };
+  };
+
+  const graphData = useMemo(() => {
+    return messages
+      .filter((m) => m.role === "user" && m.moodTag)
+      .slice(-15) // show last 15 check-ins
+      .map((m) => {
+        let score = 60;
+        if (m.moodTag === "negative") score = 30;
+        if (m.moodTag === "positive") score = 90;
+        return {
+          date: new Date(m.timestamp).toLocaleDateString([], { month: "short", day: "numeric" }),
+          score,
+          mood: m.moodTag
+        };
+      });
+  }, [messages]);
+
   return (
-    <div className="max-w-[1300px] space-y-6">
+    <div className="-m-8 p-8 min-h-full transition-all duration-500 ease-in-out" style={getMoodStyle(currentMood as MoodTag)}>
+      <div className="max-w-[1300px] space-y-6 mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-4">
@@ -289,11 +404,32 @@ export default function DeluluPage() {
             </div>
             <div>
               <p className="font-bold text-slate-800 text-sm">Delulu</p>
-              <p className="text-xs text-emerald-500 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                Online & listening
-              </p>
+              {isSpeaking ? (
+                <p className="text-xs text-violet-500 font-semibold flex items-center gap-1">
+                  <Volume2 size={11} className="animate-pulse" />
+                  Delulu is speaking...
+                </p>
+              ) : isListening ? (
+                <p className="text-xs text-rose-500 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                  Listening...
+                </p>
+              ) : (
+                <p className="text-xs text-emerald-500 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  Online & listening
+                </p>
+              )}
             </div>
+            {isSpeaking && (
+              <button
+                onClick={stopSpeaking}
+                title="Stop speaking"
+                className="ml-auto text-xs text-violet-500 border border-violet-200 rounded-lg px-2 py-1 hover:bg-violet-50 transition-colors"
+              >
+                Stop ✕
+              </button>
+            )}
           </div>
 
           {/* Messages area */}
@@ -312,7 +448,7 @@ export default function DeluluPage() {
                   <HeartHandshake size={36} className="text-violet-500" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">Hi {firstName}, I&apos;m Delulu 💜</h3>
+                  <h3 className="text-xl font-bold text-slate-800">Hi {firstName}, I&apos;m Delulu</h3>
                   <p className="text-slate-500 text-sm mt-2 max-w-sm">
                     I&apos;m your personal mental health companion. I&apos;m here to listen, support, and walk with you — whatever you&apos;re feeling.
                   </p>
@@ -366,16 +502,32 @@ export default function DeluluPage() {
 
           {/* Input area */}
           <div className="px-4 py-4 border-t border-slate-100 bg-slate-50/50">
+            {/* Mic error */}
+            {micError && (
+              <p className="text-[11px] text-rose-500 mb-2 text-center font-medium">{micError}</p>
+            )}
+            {/* Listening banner */}
+            {isListening && (
+              <div className="mb-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl bg-rose-50 border border-rose-100">
+                <span className="flex gap-0.5">
+                  {[0,1,2,3].map(i => (
+                    <span key={i} className="w-1 rounded-full bg-rose-400 animate-bounce"
+                      style={{ height: `${8 + (i % 2) * 6}px`, animationDelay: `${i * 0.1}s` }} />
+                  ))}
+                </span>
+                <span className="text-xs font-bold text-rose-600">Listening... speak now</span>
+              </div>
+            )}
             <div className="flex items-end gap-3">
               <textarea
                 ref={inputRef}
                 id="delulu-message-input"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); inputModeRef.current = "text"; }}
                 onKeyDown={handleKey}
                 placeholder="How are you feeling today?"
                 rows={1}
-                disabled={loading || !userId || userId === "..."}
+                disabled={loading || isListening || !userId || userId === "..."}
                 className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100 transition-all disabled:opacity-50 custom-scrollbar"
                 style={{ maxHeight: "120px", overflowY: "auto" }}
                 onInput={(e) => {
@@ -384,18 +536,30 @@ export default function DeluluPage() {
                   t.style.height = Math.min(t.scrollHeight, 120) + "px";
                 }}
               />
+              {/* Mic button */}
+              <button
+                id="delulu-mic-button"
+                onClick={isListening ? () => { recognitionRef.current?.stop(); } : startListening}
+                disabled={loading || !userId || userId === "..."}
+                title={isListening ? "Stop listening" : "Speak to Delulu"}
+                className={`w-11 h-11 flex items-center justify-center rounded-2xl text-white shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 shrink-0 ${
+                  isListening ? "shadow-rose-400/40" : "shadow-slate-300/40"
+                }`}
+                style={{ background: isListening
+                  ? "linear-gradient(135deg, #f43f5e, #fb7185)"
+                  : "linear-gradient(135deg, #6d28d9, #8b5cf6)" }}
+              >
+                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+              {/* Send button */}
               <button
                 id="delulu-send-button"
                 onClick={() => handleSend()}
-                disabled={loading || !input.trim() || !userId || userId === "..."}
+                disabled={loading || !input.trim() || isListening || !userId || userId === "..."}
                 className="w-11 h-11 flex items-center justify-center rounded-2xl text-white shadow-md shadow-violet-500/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:shadow-none shrink-0"
                 style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
               >
-                {loading ? (
-                  <RefreshCw size={16} className="animate-spin" />
-                ) : (
-                  <Send size={16} />
-                )}
+                {loading ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
             <p className="text-[10px] text-slate-400 mt-2 text-center">
@@ -438,7 +602,6 @@ export default function DeluluPage() {
                       key={i}
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color} border border-current/10`}
                     >
-                      <span>{cfg.emoji}</span>
                       <span>{cfg.label}</span>
                     </div>
                   );
@@ -447,10 +610,47 @@ export default function DeluluPage() {
             )}
           </div>
 
+          {/* Mental Wellness Trend Graph */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity size={15} className="text-violet-400" />
+              <h3 className="text-sm font-bold text-slate-700">Mental Wellness Trend</h3>
+            </div>
+            {graphData.length < 2 ? (
+              <p className="text-xs text-slate-400 text-center py-3">
+                Chat more to see your mood trend over time
+              </p>
+            ) : (
+              <div className="h-32 w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={graphData}>
+                    <Line type="monotone" dataKey="score" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 4, fill: "#8b5cf6" }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          const cfg = MOOD_CONFIG[data.mood as MoodTag] || MOOD_CONFIG.neutral;
+                          return (
+                            <div className="bg-white p-2 rounded-lg shadow-md border border-slate-100 text-xs font-semibold">
+                              <p className="text-slate-500 mb-1">{data.date}</p>
+                              <p className={cfg.color}>{cfg.label}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                      cursor={{ stroke: '#f1f5f9', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
           {/* Tips card */}
           <div className="rounded-3xl p-5 border border-violet-100"
             style={{ background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)" }}>
-            <h3 className="text-sm font-bold text-violet-800 mb-2">💜 Daily Tip</h3>
+            <h3 className="text-sm font-bold text-violet-800 mb-2">Daily Tip</h3>
             <p className="text-xs text-violet-700 leading-relaxed">
               Try writing down 3 things you&apos;re grateful for today. Small moments of gratitude can shift your perspective over time.
             </p>
@@ -462,13 +662,14 @@ export default function DeluluPage() {
             <p className="text-xs text-rose-600 leading-relaxed">
               If you&apos;re struggling, consider speaking with a qualified therapist or counselor.
             </p>
-            <button className="mt-3 w-full py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
+            <Link href="/patient/therapists" className="mt-3 w-full flex items-center justify-center py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #f43f5e, #fb7185)" }}>
-              Talk to a Therapist →
-            </button>
+              Connect with a Mental Health Specialist →
+            </Link>
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

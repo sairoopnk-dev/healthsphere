@@ -27,7 +27,8 @@
     "mongodb-memory-server": "^11.0.1",
     "mongoose": "^9.3.3",
     "multer": "^2.1.1",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "sentiment": "^5.0.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -36,6 +37,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.0",
+    "@types/sentiment": "^5.0.4",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"

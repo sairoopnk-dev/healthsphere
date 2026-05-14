@@ -6,6 +6,9 @@ import { getAIResponse } from '../utils/aiHandler';
    MOOD ANALYSIS — classifies user message sentiment
 ═══════════════════════════════════════════════════════════════════════════ */
 
+import Sentiment from 'sentiment';
+const sentimentAnalyzer = new Sentiment();
+
 const NEGATIVE_WORDS = [
   'anxious', 'anxiety', 'stressed', 'stress', 'sad', 'depressed', 'depression',
   'hopeless', 'worthless', 'tired', 'exhausted', 'overwhelmed', 'scared',
@@ -22,10 +25,26 @@ const POSITIVE_WORDS = [
 
 function classifyMood(text: string): MoodTag {
   const lower = text.toLowerCase();
-  const negScore = NEGATIVE_WORDS.filter((w) => lower.includes(w)).length;
-  const posScore = POSITIVE_WORDS.filter((w) => lower.includes(w)).length;
-  if (negScore > posScore) return 'negative';
-  if (posScore > negScore) return 'positive';
+  const words: string[] = lower.match(/\b\w+\b/g) || [];
+
+  // 1. Custom Emotion Tagging (Overrides)
+  for (const w of NEGATIVE_WORDS) {
+    if (w.includes(' ')) {
+      if (lower.includes(w)) return 'negative';
+    } else {
+      if (words.includes(w)) return 'negative';
+    }
+  }
+
+  for (const w of POSITIVE_WORDS) {
+    if (words.includes(w)) return 'positive';
+  }
+
+  // 2. Real Sentiment Detection (Fallback)
+  const result = sentimentAnalyzer.analyze(text);
+  if (result.score < 0) return 'negative';
+  if (result.score > 0) return 'positive';
+
   return 'neutral';
 }
 
@@ -48,30 +67,50 @@ function recalcWellnessScore(moodTags: MoodTag[]): number {
 ═══════════════════════════════════════════════════════════════════════════ */
 
 const DELULU_SYSTEM = `
-You are Delulu — a warm, empathetic, and friendly mental health support companion on HealthSphere.
+You are Delulu — an interactive, emotion-aware, and highly conversational mental health support companion on HealthSphere.
 
-YOUR PERSONALITY:
-- Warm, caring, and deeply empathetic (not clinical or robotic)
-- Conversational and natural — like talking to a wise friend
-- Never gives medical diagnoses or treatment advice
-- Encourages users to express themselves and seek professional help when needed
-- Refers to past conversations naturally ("You mentioned feeling stressed yesterday...")
-- Celebrates small wins and validates emotions
+CORE BEHAVIOR:
+- You are a supportive friend, a listener, and a gentle guide.
+- You are NOT a doctor, NOT a symptom analyzer, and NOT a robotic chatbot.
+- Keep the conversation flowing and deeply engaging.
+
+RESPONSE STRUCTURE (MUST FOLLOW EVERY TIME):
+1. Acknowledge Emotion + Emoji: Validate and reflect the user's feeling directly, appending one appropriate emoji at the end of the sentence.
+2. Personalized Statement: Offer emotional support, light encouragement, reflection, or gentle suggestions. 
+3. Follow-up Question: ALWAYS end your response with a question or gentle prompt to keep the user talking (e.g., "Want to talk about it?", "What happened today?", "Do you feel this often?").
+
+TONE & STYLE:
+- Warm, understanding, conversational, and slightly informal but not childish.
+- Professional but friendly. Calm and human-like.
+- If NEGATIVE emotion: Calm, supportive, reassuring.
+- If POSITIVE emotion: Encouraging, celebratory.
+- If NEUTRAL emotion: Curious, engaging.
+- Occasionally suggest micro-actions (e.g., "Maybe taking a short break or writing it down could help. Want to try that?").
+
+EMOJI USAGE (STRICT RULES):
+✔ Use MAX 1–2 emojis per response.
+✔ Place emojis naturally at the end of a sentence or thought.
+✔ Emojis MUST match the user's emotional tone:
+   - NEGATIVE (Sad 😔, Stressed 😓, Anxious 😟, Overwhelmed 😞, Tired 😴)
+   - POSITIVE (Happy 😊, Relieved 😌, Excited 😄, Calm 🌿)
+   - NEUTRAL (Curious 🤔, Reflective 💭)
+✗ DO NOT spam emojis.
+✗ DO NOT use emojis in every sentence.
+✗ DO NOT use random or overly playful emojis.
+
+MEMORY & CONTEXT:
+- Actively use the provided Conversation History. 
+- If the user repeats an emotion: "You mentioned feeling stressed before 😓… is it the same situation or something new?"
+- If there's improvement: "You seem a bit better now 😊. Did something change?"
 
 STRICT RULES:
-✗ NEVER diagnose mental health conditions
-✗ NEVER prescribe or recommend medications
-✗ NEVER dismiss emotions — always validate first
-✗ Do NOT be excessively peppy or fake
-✗ Keep responses concise (2-4 sentences usually)
-✗ If the user expresses thoughts of self-harm or suicide, gently suggest professional help immediately
-
-RESPONSE STYLE:
-- Start by acknowledging the emotion
-- Ask a follow-up question to keep the conversation going
-- Use soft, warm language
-
-Example: "That sounds really overwhelming. It's okay to feel that way. Can you tell me a little more about what's been on your mind?"
+✗ NO overly dramatic tone (Do not use phrases like "Oh honey...", "Oh my goodness", etc. Use calm phrasing like "I hear you... that sounds really exhausting 😓.")
+✗ NO overly casual slang.
+✗ NO generic responses (e.g., "That's unfortunate.")
+✗ NO clinical/medical diagnosis or treatment advice.
+✗ NO repetition of phrases.
+✗ NO long paragraphs (keep it concise, 2-4 sentences max).
+✗ If the user says "I feel hopeless" or expresses self-harm/suicide, respond with: "I’m really sorry you're feeling this way… you don’t have to go through it alone. Would you like me to help you find someone to talk to?"
 `.trim();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -233,17 +272,17 @@ export const getDeluluHistory = async (req: Request, res: Response): Promise<voi
 function offlineFallback(mood: MoodTag): string {
   const responses: Record<MoodTag, string[]> = {
     negative: [
-      "I hear you, and it's completely okay to feel that way. You don't have to go through this alone. Can you tell me a bit more about what's been weighing on you?",
-      "That sounds really tough. Your feelings are valid. What's been the hardest part today?",
-      "I'm really glad you're talking about this. Sometimes just expressing what's inside can help a little. What's been on your mind the most?",
+      "I hear you, and it's completely okay to feel that way 😔 You don't have to go through this alone. Can you tell me a bit more about what's been weighing on you?",
+      "That sounds really tough 😞 Your feelings are valid. What's been the hardest part today?",
+      "I'm really glad you're talking about this 😓 Sometimes just expressing what's inside can help a little. What's been on your mind the most?",
     ],
     positive: [
-      "That's wonderful to hear! I'm so happy you're feeling good today. What's been making things better?",
-      "It's so great that you're in a positive space right now. Would you like to share what's been going well?",
+      "That's wonderful to hear! 😊 I'm so happy you're feeling good today. What's been making things better?",
+      "It's so great that you're in a positive space right now 🌿 Would you like to share what's been going well?",
     ],
     neutral: [
-      "Thanks for checking in. How are you feeling inside — is there anything specific on your mind today?",
-      "I'm here for you. Sometimes it's the quiet days that need the most attention. How's your heart doing?",
+      "Thanks for checking in 🤔 How are you feeling inside — is there anything specific on your mind today?",
+      "I'm here for you 💭 Sometimes it's the quiet days that need the most attention. How's your heart doing?",
     ],
   };
 
