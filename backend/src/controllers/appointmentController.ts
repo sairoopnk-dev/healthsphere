@@ -113,14 +113,20 @@ export const getPatientAppointments = async (req: Request, res: Response): Promi
     const all = await Appointment.find({ patientId }).sort({ date: 1 }).lean();
     const sorted = sortChrono(all);
 
+    // upcoming = scheduled (non-expired), sorted asc
     const upcomingAppointments = sorted
       .filter((a: any) => a.status !== 'completed' && a.status !== 'cancelled');
 
+    // past = completed OR cancelled-by-patient; doctor_leave cancellations are hidden entirely
     const pastAppointments = [...sorted]
-      .filter((a: any) => a.status === 'completed' || a.status === 'cancelled')
+      .filter((a: any) =>
+        (a.status === 'completed') ||
+        (a.status === 'cancelled' && a.cancellationReason !== 'doctor_leave')
+      )
       .reverse(); // descending: most recent first
 
     res.status(200).json({ success: true, upcomingAppointments, pastAppointments });
+
   } catch (error: any) {
     console.error('[Appointment] getPatientAppointments error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to fetch patient appointments' });

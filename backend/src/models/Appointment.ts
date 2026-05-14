@@ -10,10 +10,11 @@ export interface IAppointment extends Document {
   date:         string;    // YYYY-MM-DD
   timeSlot:     string;    // e.g. "09:00 AM"
   status:       'scheduled' | 'completed' | 'cancelled';
-  diagnosis?:   string;    // filled by doctor after visit
-  reportUrl?:   string;    // URL to report PDF/image if any
-  severityScore?: number;  // 1–10, from AI symptom checker
-  isPriority?:  boolean;   // doctor can pin to top
+  diagnosis?:   string;
+  reportUrl?:   string;
+  severityScore?: number;
+  isPriority?:  boolean;
+  cancellationReason?: string;  // 'doctor_leave' hides from patient Past view
   createdAt:    Date;
 }
 
@@ -31,6 +32,7 @@ const AppointmentSchema: Schema = new Schema({
   reportUrl:     { type: String, default: '' },      // optional report file URL
   severityScore: { type: Number, default: null },
   isPriority:    { type: Boolean, default: false },
+  cancellationReason: { type: String, default: '' },  // 'doctor_leave' → hidden from patient Past
 }, { timestamps: true });
 
 // Compound index: fast chronological sort per patient

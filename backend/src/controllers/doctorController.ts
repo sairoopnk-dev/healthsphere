@@ -8,6 +8,7 @@ import { getRecentSymptoms } from '../services/insightEngine';
 import Interaction from '../models/Interaction';
 import { GoogleGenAI } from '@google/genai';
 import DoctorPatient from '../models/DoctorPatient';
+import DoctorAvailability from '../models/DoctorAvailability';
 
 const otpStore: Record<string, string> = {};
 
@@ -47,6 +48,149 @@ export const updateBlockedDates = async (req: Request, res: Response): Promise<v
   }
 };
 
+// ─── GET doctor availability (blocked slots) for a date range ─────────────────
+export const getAvailability = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { doctorId, from, to } = req.query as { doctorId: string; from?: string; to?: string };
+    if (!doctorId) { res.status(400).json({ message: 'doctorId is required' }); return; }
+
+    const filter: any = { doctorId };
+    if (from || to) {
+      filter.date = {};
+      if (from) filter.date.$gte = from;
+      if (to)   filter.date.$lte = to;
+    }
+
+    const docs = await DoctorAvailability.find(filter).lean();
+    res.json(docs);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── POST update partial slot blocking + auto-cancel affected appointments ───────
+export const updateAvailability = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { doctorId, date, fullDayBlocked, blockedSlots } = req.body;
+    if (!doctorId || !date) {
+      res.status(400).json({ message: 'doctorId and date are required' }); return;
+    }
+
+    // Read PREVIOUS state before overwriting — used to compute newly-blocked delta
+    const previous = await DoctorAvailability.findOne({ doctorId, date }).lean() as any;
+    const prevFullDay: boolean = previous?.fullDayBlocked ?? false;
+    const prevSlots: string[]  = previous?.blockedSlots   ?? [];
+
+    const newFullDay  = !!fullDayBlocked;
+    const newSlots: string[] = Array.isArray(blockedSlots) ? blockedSlots : [];
+
+    // Slots that are NEWLY blocked (were not blocked before) → need cancellation
+    let newlyBlockedSlots: string[] = [];
+    if (newFullDay && !prevFullDay) {
+      // Entire day newly blocked — all slots need cancellation (pass [] as signal for full-day)
+      newlyBlockedSlots = [];
+    } else if (!newFullDay) {
+      // Partial: only slots added in this update
+      newlyBlockedSlots = newSlots.filter(s => !prevSlots.includes(s));
+    }
+    // If newFullDay && prevFullDay → already blocked, no new cancellations needed
+
+    await DoctorAvailability.findOneAndUpdate(
+      { doctorId, date },
+      { fullDayBlocked: newFullDay, blockedSlots: newSlots },
+      { upsert: true, new: true }
+    );
+
+    // Sync Doctor.blockedDates for backward-compat
+    const doctor = await Doctor.findOne({ doctorId });
+    if (doctor) {
+      if (newFullDay && !doctor.blockedDates.includes(date)) {
+        doctor.blockedDates = [...doctor.blockedDates, date];
+      } else if (!newFullDay && doctor.blockedDates.includes(date)) {
+        doctor.blockedDates = doctor.blockedDates.filter(d => d !== date);
+      }
+      await doctor.save();
+    }
+
+    // Only trigger cancellations for truly NEW blocks (not for unblock operations)
+    let cancelResult = { cancelled: 0, notified: 0 };
+    if (newFullDay && !prevFullDay) {
+      // Full day newly blocked
+      cancelResult = await cancelAppointmentsForLeave(doctorId, date, true, []);
+    } else if (!newFullDay && newlyBlockedSlots.length > 0) {
+      // Specific new slots blocked
+      cancelResult = await cancelAppointmentsForLeave(doctorId, date, false, newlyBlockedSlots);
+    }
+    // Unblock (newSlots ⊆ prevSlots or newFullDay → false): no cancellations, appointments stay cancelled permanently
+
+    res.json({ message: 'Availability updated.', cancelResult });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── Helper: cancel appointments that overlap newly-blocked leave slots ─────────
+async function cancelAppointmentsForLeave(
+  doctorId: string,
+  date: string,
+  fullDayBlocked: boolean,  // true = cancel ALL slots on this date
+  newlyBlockedSlots: string[], // only the slots added in this update
+): Promise<{ cancelled: number; notified: number }> {
+  try {
+    // Build query: only 'scheduled' appointments (never touch already-cancelled ones)
+    const query: any = { doctorId, date, status: 'scheduled' };
+    if (!fullDayBlocked) {
+      if (newlyBlockedSlots.length === 0) return { cancelled: 0, notified: 0 };
+      query.timeSlot = { $in: newlyBlockedSlots };
+    }
+    // fullDayBlocked=true → no timeSlot filter → cancels ALL scheduled on that date
+
+    const affected = await Appointment.find(query).lean();
+    if (affected.length === 0) return { cancelled: 0, notified: 0 };
+
+    const appointmentIds = affected.map((a: any) => a.appointmentId);
+
+    // Permanently mark cancelled with doctor_leave — hidden from patient Past view
+    await Appointment.updateMany(
+      { appointmentId: { $in: appointmentIds } },
+      { $set: { status: 'cancelled', cancellationReason: 'doctor_leave' } }
+    );
+
+    // Build notifications with doctor name, date, and time
+    const NotificationModel = (await import('../models/Notification')).default;
+    const doctorDoc = await Doctor.findOne({ doctorId }).select('name').lean();
+    const doctorName = (doctorDoc as any)?.name || 'Unknown';
+    const [y, mo, d] = date.split('-');
+    const displayDate = `${d}-${mo}-${y}`;
+
+    const seen = new Set<string>();
+    const notifDocs: any[] = [];
+
+    for (const appt of affected as any[]) {
+      const key = `${appt.patientId}|${appt.timeSlot}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      notifDocs.push({
+        patientId: appt.patientId,
+        type: 'appointment',
+        text: `Your appointment with Dr. ${doctorName} on ${displayDate} at ${appt.timeSlot} has cancelled.`,
+        date,
+        isRead: false,
+      });
+    }
+
+    if (notifDocs.length > 0) await NotificationModel.insertMany(notifDocs);
+
+    console.log(`[Leave] Cancelled ${appointmentIds.length} appt(s), sent ${notifDocs.length} notif(s) for ${doctorId} on ${date}`);
+    return { cancelled: appointmentIds.length, notified: notifDocs.length };
+  } catch (err: any) {
+    console.error('[Leave] cancelAppointmentsForLeave error:', err.message);
+    return { cancelled: 0, notified: 0 };
+  }
+}
+
+
+
 // ─── GET weekly appointments for a doctor ─────────────────────────────────────
 export const getDoctorWeekAppointments = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -70,9 +214,12 @@ export const getDoctorWeekAppointments = async (req: Request, res: Response): Pr
     endDate.setDate(startDate.getDate() + 6);
     endDate.setHours(23, 59, 59, 999);
 
+    // Only return SCHEDULED appointments — cancelled (including doctor_leave) must never
+    // reappear in the weekly grid after an unblock operation.
     const appointments = await Appointment.find({
       doctorId,
-      date: { $gte: toYMD(startDate), $lte: toYMD(endDate) }
+      date:   { $gte: toYMD(startDate), $lte: toYMD(endDate) },
+      status: 'scheduled',
     }).sort({ date: 1, timeSlot: 1 });
 
     console.log(`[Schedule] doctorId=${doctorId} weekOffset=${weekOffset} window=${toYMD(startDate)}→${toYMD(endDate)} found=${appointments.length}`);
@@ -88,11 +235,24 @@ export const bookAppointment = async (req: Request, res: Response): Promise<void
   try {
     const { patientId, patientName, doctorId, doctorName, hospital, date, timeSlot } = req.body;
 
-    // Check if slot is already taken or doctor has blocked the date
+    // Check doctor exists
     const doctor = await Doctor.findOne({ doctorId });
     if (!doctor) { res.status(404).json({ message: 'Doctor not found' }); return; }
+
+    // Check full-day block
     if (doctor.blockedDates?.includes(date)) {
       res.status(400).json({ message: 'Doctor is unavailable on this date.' }); return;
+    }
+
+    // Check partial slot block via DoctorAvailability
+    const avail = await DoctorAvailability.findOne({ doctorId, date });
+    if (avail) {
+      if (avail.fullDayBlocked) {
+        res.status(400).json({ message: 'Doctor is unavailable on this date.' }); return;
+      }
+      if (avail.blockedSlots.includes(timeSlot)) {
+        res.status(400).json({ message: `The ${timeSlot} slot is blocked by the doctor.` }); return;
+      }
     }
 
     const existingSlot = await Appointment.findOne({ doctorId, date, timeSlot, status: 'scheduled' });
@@ -115,9 +275,17 @@ export const getAvailableSlots = async (req: Request, res: Response): Promise<vo
     const doctor = await Doctor.findOne({ doctorId });
     if (!doctor) { res.status(404).json({ message: 'Doctor not found' }); return; }
 
+    // Check full-day block
     if (doctor.blockedDates?.includes(date)) {
-      res.json({ blocked: true, slots: [] }); return;
+      res.json({ blocked: true, blockedSlots: [], slots: [] }); return;
     }
+
+    // Fetch partial slot blocks
+    const avail = await DoctorAvailability.findOne({ doctorId, date });
+    if (avail?.fullDayBlocked) {
+      res.json({ blocked: true, blockedSlots: [], slots: [] }); return;
+    }
+    const partialBlockedSlots: string[] = avail?.blockedSlots ?? [];
 
     // ── Generate 9:00 AM → 9:00 PM in 30-min increments ──────────────────
     function formatSlot(d: Date): string {
@@ -128,10 +296,9 @@ export const getAvailableSlots = async (req: Request, res: Response): Promise<vo
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
     }
 
-    const todayYMD = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    const todayYMD = new Date().toISOString().split('T')[0];
     const isToday = date === todayYMD;
 
-    // If today, cut off past slots (round up to next 30-min boundary)
     let cutoffMinutes = 0;
     if (isToday) {
       const now = new Date();
@@ -152,12 +319,12 @@ export const getAvailableSlots = async (req: Request, res: Response): Promise<vo
       cur.setMinutes(cur.getMinutes() + 30);
     }
 
-    // Exclude already-booked slots
+    // Exclude already-booked slots + doctor-blocked slots
     const booked = await Appointment.find({ doctorId, date, status: 'scheduled' }).select('timeSlot');
     const bookedSlots = booked.map(a => a.timeSlot);
-    const available = allSlots.filter(s => !bookedSlots.includes(s));
+    const available = allSlots.filter(s => !bookedSlots.includes(s) && !partialBlockedSlots.includes(s));
 
-    res.json({ blocked: false, slots: available });
+    res.json({ blocked: false, blockedSlots: partialBlockedSlots, slots: available });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

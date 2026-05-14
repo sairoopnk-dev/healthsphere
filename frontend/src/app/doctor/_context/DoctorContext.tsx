@@ -65,6 +65,11 @@ interface DoctorContextType {
   getSlotsForDay: (date: Date) => any[];
   isExpiredSlot: (date: Date, slot: string) => boolean;
   totalApptThisWeek: number;
+  // Availability (partial slot blocking)
+  availabilityMap: Record<string, { fullDayBlocked: boolean; blockedSlots: string[] }>;
+  updateAvailability: (date: string, fullDayBlocked: boolean, blockedSlots: string[]) => Promise<void>;
+  fetchAvailability: (from: string, to: string) => Promise<void>;
+  selectedLeaveDate: string; setSelectedLeaveDate: (v: string) => void;
   // Patient access
   searchId: string; setSearchId: (v: string) => void;
   otp: string[]; setOtp: (v: string[]) => void;
@@ -136,6 +141,10 @@ export function DoctorProvider({ children }: { children: ReactNode }) {
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [leaveMode, setLeaveMode] = useState(false);
 
+  // Availability (partial slot blocking)
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, { fullDayBlocked: boolean; blockedSlots: string[] }>>({});
+  const [selectedLeaveDate, setSelectedLeaveDate] = useState<string>("");
+
   // Patient access
   const [searchId, setSearchId] = useState("");
   const [otp, setOtp] = useState(["","","","","",""]);
@@ -185,6 +194,40 @@ export function DoctorProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  const fetchAvailability = useCallback(async (from: string, to: string) => {
+    if (!doctor) return;
+    try {
+      const res = await fetch(`${API}/api/doctor/availability?doctorId=${doctor.id}&from=${from}&to=${to}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const map: Record<string, { fullDayBlocked: boolean; blockedSlots: string[] }> = {};
+        data.forEach((entry: any) => {
+          map[entry.date] = { fullDayBlocked: entry.fullDayBlocked, blockedSlots: entry.blockedSlots || [] };
+        });
+        setAvailabilityMap(prev => ({ ...prev, ...map }));
+      }
+    } catch {}
+  }, [doctor]);
+
+  const updateAvailability = useCallback(async (date: string, fullDayBlocked: boolean, blockedSlots: string[]) => {
+    if (!doctor) return;
+    // Optimistic update
+    setAvailabilityMap(prev => ({ ...prev, [date]: { fullDayBlocked, blockedSlots } }));
+    // Sync blockedDates array for backward compat
+    setBlockedDates(prev => {
+      if (fullDayBlocked && !prev.includes(date)) return [...prev, date];
+      if (!fullDayBlocked && prev.includes(date)) return prev.filter(d => d !== date);
+      return prev;
+    });
+    await fetch(`${API}/api/doctor/availability`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doctorId: doctor.id, date, fullDayBlocked, blockedSlots }),
+    });
+    // Refresh schedule so cancelled appointments disappear immediately
+    await fetchSchedule(doctor.id, weekOffset);
+  }, [doctor, weekOffset, fetchSchedule]);
+
   const fetchSavedPatients = useCallback(async () => {
     if (!doctor) return;
     try {
@@ -218,17 +261,22 @@ export function DoctorProvider({ children }: { children: ReactNode }) {
     if (doctor) {
       fetchSchedule(doctor.id, weekOffset);
       fetchSavedPatients();
+      // Fetch availability for the current week
+      const dates = getWeekDates(weekOffset);
+      const from = toYMD(dates[0]);
+      const to   = toYMD(dates[6]);
+      fetchAvailability(from, to);
     }
-  }, [weekOffset, doctor, fetchSavedPatients]);
+  }, [weekOffset, doctor, fetchSavedPatients, fetchAvailability]);
 
   const toggleBlock = async (date: string) => {
     if (!doctor) return;
-    const nb = blockedDates.includes(date) ? blockedDates.filter(d => d !== date) : [...blockedDates, date];
-    setBlockedDates(nb);
-    await fetch(`${API}/api/doctor/blocked-dates`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ doctorId: doctor.id, blockedDates: nb })
-    });
+    const isBlocked = blockedDates.includes(date);
+    const newFullDay = !isBlocked;
+    // Keep existing partial slots if unblocking a full-day; reset if blocking full day
+    const existing = availabilityMap[date];
+    const slots = newFullDay ? [] : (existing?.blockedSlots ?? []);
+    await updateAvailability(date, newFullDay, slots);
   };
 
   const getSlotsForDay = (date: Date) => appointments.filter(a => a.date === toYMD(date));
@@ -402,6 +450,7 @@ export function DoctorProvider({ children }: { children: ReactNode }) {
       doctor, doctorProfile,
       weekOffset, setWeekOffset, weekDates, appointments, activeSlot, setActiveSlot,
       blockedDates, leaveMode, setLeaveMode, toggleBlock, getSlotsForDay, isExpiredSlot, totalApptThisWeek,
+      availabilityMap, updateAvailability, fetchAvailability, selectedLeaveDate, setSelectedLeaveDate,
       searchId, setSearchId, otp, setOtp, accessStep, setAccessStep, accessError, setAccessError,
       accessLoading, patientData, setPatientData, patientTimeline, setPatientTimeline,
       savedPatients, setSavedPatients, fetchSavedPatients, handleAddSavedPatient, openPatientRecords,

@@ -7,6 +7,8 @@ import {
   getDoctorWeekAppointments,
   bookAppointment,
   getAvailableSlots,
+  getAvailability,
+  updateAvailability,
   requestPatientAccess,
   verifyPatientAccess,
   addPatientRecord,
@@ -27,6 +29,8 @@ router.post('/blocked-dates',      updateBlockedDates);
 router.get('/schedule/:doctorId',  getDoctorWeekAppointments);
 router.post('/book',               bookAppointment);
 router.get('/slots',               getAvailableSlots);
+router.get('/availability',        getAvailability);
+router.post('/availability',       updateAvailability);
 router.post('/search',             requestPatientAccess);
 router.post('/verify',             verifyPatientAccess);
 

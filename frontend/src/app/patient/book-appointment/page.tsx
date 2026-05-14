@@ -162,6 +162,11 @@ function BookAppointmentContent() {
   const [success, setSuccess] = useState(false);
   const [error,   setError]   = useState("");
 
+  // ── Doctor availability (blocked slots) ──
+  const [dateFullyBlocked,  setDateFullyBlocked]  = useState(false);
+  const [doctorBlockedSlots, setDoctorBlockedSlots] = useState<string[]>([]);
+  const [availLoading, setAvailLoading] = useState(false);
+
   // ── Load patient from localStorage ──
   useEffect(() => {
     const raw = localStorage.getItem("user");
@@ -182,6 +187,29 @@ function BookAppointmentContent() {
       .catch(console.error)
       .finally(() => setLoadingDoctors(false));
   }, []);
+
+  // ── Fetch doctor availability when doctor + date are selected ──
+  useEffect(() => {
+    if (!selectedDoctor || !form.date) {
+      setDateFullyBlocked(false);
+      setDoctorBlockedSlots([]);
+      return;
+    }
+    setAvailLoading(true);
+    fetch(`http://localhost:8000/api/doctor/slots?doctorId=${selectedDoctor.doctorId}&date=${form.date}`)
+      .then(r => r.json())
+      .then(data => {
+        setDateFullyBlocked(!!data.blocked);
+        setDoctorBlockedSlots(Array.isArray(data.blockedSlots) ? data.blockedSlots : []);
+        // If currently selected timeSlot got blocked, clear it
+        setForm(prev => ({
+          ...prev,
+          timeSlot: data.blocked || (data.blockedSlots ?? []).includes(prev.timeSlot) ? "" : prev.timeSlot,
+        }));
+      })
+      .catch(() => { setDateFullyBlocked(false); setDoctorBlockedSlots([]); })
+      .finally(() => setAvailLoading(false));
+  }, [selectedDoctor, form.date]);
 
   // ── Derived: unique hospitals ──
   const allHospitals = useMemo(() => {
@@ -537,14 +565,30 @@ function BookAppointmentContent() {
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5">Time Slot <span className="text-red-400">*</span></label>
-                        {(() => {
-                          const slots = getAvailableTimeSlots(form.date);
+                        {availLoading ? (
+                          <div className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl bg-slate-50 text-sm text-slate-400 font-medium flex items-center gap-2">
+                            <div className="w-3.5 h-3.5 border-2 border-teal-400 border-t-transparent rounded-full animate-spin"/>
+                            Checking availability…
+                          </div>
+                        ) : dateFullyBlocked ? (
+                          <div className="w-full px-4 py-3.5 border border-red-200 rounded-2xl bg-red-50 text-sm text-red-600 font-semibold">
+                            🚫 Doctor is on leave this day
+                          </div>
+                        ) : (() => {
+                          const slots = getAvailableTimeSlots(form.date, doctorBlockedSlots);
                           return (
-                            <select value={form.timeSlot} onChange={e => set("timeSlot", e.target.value)} required
-                              className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 text-sm font-semibold text-slate-700 bg-slate-50 transition-all appearance-none cursor-pointer">
-                              <option value="">{form.date ? (slots.length ? "Select a slot" : "No slots available today") : "Pick a date first"}</option>
-                              {slots.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                            <>
+                              <select value={form.timeSlot} onChange={e => set("timeSlot", e.target.value)} required
+                                className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 text-sm font-semibold text-slate-700 bg-slate-50 transition-all appearance-none cursor-pointer">
+                                <option value="">{form.date ? (slots.length ? "Select a slot" : "No slots available") : "Pick a date first"}</option>
+                                {slots.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                              {doctorBlockedSlots.length > 0 && (
+                                <p className="text-[11px] text-orange-600 font-semibold mt-1.5">
+                                  ⚡ {doctorBlockedSlots.length} slot{doctorBlockedSlots.length !== 1 ? "s" : ""} unavailable on this date
+                                </p>
+                              )}
+                            </>
                           );
                         })()}
                       </div>
