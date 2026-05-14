@@ -38,6 +38,56 @@ const SUGGESTED_PROMPTS = [
   "I had a bad day",
 ];
 
+/* ── Language ────────────────────────────────────────────────────────────────────────── */
+type Language = "en" | "kn";
+
+const T = {
+  en: {
+    companion: "Your mental health companion — always here to listen",
+    online: "Online",
+    delulu: "Delulu is thinking...",
+    typingPlaceholder: "What's on your mind?",
+    emptyTitle: "Hey, I'm Delulu! 💜",
+    emptySubtitle: "I'm here for you. Talk to me about anything — stress, joy, or just your day.",
+    send: "Send",
+    listening: "Listening...",
+    speaking: "Delulu is speaking...",
+    stopListening: "Stop",
+    stopSpeaking: "Stop",
+    wellnessScore: "Wellness Score",
+    moodStreak: "Mood Streak",
+    recentMoods: "Recent Moods",
+    wellnessChart: "Wellness Chart",
+    dailyTip: "Daily Tip",
+    dailyTipText: "Try writing down 3 things you\u2019re grateful for today. Small moments of gratitude can shift your perspective over time.",
+    needSupport: "Need more support?",
+    needSupportText: "You\u2019re not alone. If things feel overwhelming, reach out to a counsellor.",
+    bookSession: "Book a Session →",
+  },
+  kn: {
+    companion: "ಉಮ್ಮನ್ನು ಕೇಳಲು ಯಾವಾಗಲೂ ಇಲ್ಲಿ ಮಾನಸಿಕ ಆರೋಗ್ಯ ಸಹಾಯಕ",
+    online: "ಲೈವ್ ಆಗಿದೊೆ",
+    delulu: "Delulu ಆಲೋಚಿಸುತ್ತಿದ್ದಾರೆ...",
+    typingPlaceholder: "ನಿಮ್ಮ ಮನಸ್ಸಿನಲ್ಲಿ ಏನಿದೆ?",
+    emptyTitle: "ನಮಸ್ಕಾರ, ನಾನು Delulu! 💜",
+    emptySubtitle: "ನಿಮ್ಮಗಾಗಿ ನಾನಿದ್ದೇನೆ. ಎನ್ನದಾದರೂ ಹೇಳಿಕೊಳ್ಳಿ — ಒತ್ತಡ, ಸಂತೋಷ, ಅಥವಾ ನಿಮ್ಮ ದಿನಚರಿ.",
+    send: "ಕಳುಹಿಸಿ",
+    listening: "ಕೇಳುತ್ತಿದೊೆ...",
+    speaking: "Delulu ಮಾತನಾಡುತ್ತಿದ್ದಾರೆ...",
+    stopListening: "ನಿಲ್ಲಿಸಿ",
+    stopSpeaking: "ನಿಲ್ಲಿಸಿ",
+    wellnessScore: "ಆರೋಗ್ಯ ಅಂಕ",
+    moodStreak: "ಮನಸ್ಥಿತಿ ಸರಣಿ",
+    recentMoods: "ಇಜೀಚೆಗೆ ಮನಸ್ಥಿತಿ",
+    wellnessChart: "ಆರೋಗ್ಯ ಆಲೇಖಚಿತ್ರ",
+    dailyTip: "ದೈನಂದಿನ ಸಲಹೆ",
+    dailyTipText: "ಇಂದು ನಿಮ್ಮನ್ನು ಸಂತೋಷಪಡಿಸಿದ  3 ವಿಷಯಗಳನ್ನು ಬರೆಯಿರಿ. ಕೃತಜ್ಞತೆಯ ಚಿಕ್ಕ ಕ್ಷಣಗಳು ನಿಮ್ಮ ದೃಷ್ಟಿಕೋನವನ್ನು ಬದಲಾಯಿಸಲು ಸಹಾಯಕವಾಗಲಿದೆ.",
+    needSupport: "ಮತ್ತಷ್ಟು ಬೆಂಬಲ ಬೇಕೇ?",
+    needSupportText: "ನೀವು ಒಂಟರಲ್ಲ. ಎಲ್ಲಾ ಕಷ್ಟವಾಗಿ ತೋನ್ನಿದರೆ, ಸಲಹಗಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    bookSession: "ಸೇವೆ ಬುಕ್ ಮಾಡಿ →",
+  },
+} as const;
+
 const MOOD_CONFIG: Record<MoodTag, { color: string; bg: string; label: string }> = {
   positive: { color: "text-emerald-600", bg: "bg-emerald-50", label: "Positive" },
   neutral:  { color: "text-slate-500",   bg: "bg-slate-50",   label: "Neutral" },
@@ -169,6 +219,24 @@ export default function DeluluPage() {
   const [wellnessScore, setWellnessScore] = useState(70);
   const [moodStreak, setMoodStreak] = useState<MoodTag[]>([]);
 
+  /* ── Language state ── */
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("delulu_lang") as Language) || "en";
+    }
+    return "en";
+  });
+
+  const toggleLanguage = useCallback(() => {
+    setLanguage(prev => {
+      const next: Language = prev === "en" ? "kn" : "en";
+      localStorage.setItem("delulu_lang", next);
+      return next;
+    });
+  }, []);
+
+  const t = T[language];
+
   /* ── Voice state ── */
   const [isListening, setIsListening]   = useState(false);
   const [isSpeaking, setIsSpeaking]     = useState(false);
@@ -183,35 +251,45 @@ export default function DeluluPage() {
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    
+
     let clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, "").trim();
     clean = clean.replace(/\./g, ". ");
 
     const utt = new SpeechSynthesisUtterance(clean);
-    
+
     const loadVoicesAndSpeak = () => {
       const voices = window.speechSynthesis.getVoices();
-      const femaleVoice = voices.find(v => 
-        v.name.toLowerCase().includes("female") ||
-        v.name.toLowerCase().includes("zira") ||
-        v.name.toLowerCase().includes("google uk english female") ||
-        v.name.toLowerCase().includes("samantha")
-      );
-      
-      if (femaleVoice) {
-        utt.voice = femaleVoice;
-      } else if (voices.length > 0) {
-        utt.voice = voices[0];
+
+      let selectedVoice: SpeechSynthesisVoice | undefined;
+
+      if (language === "kn") {
+        // Prefer a Kannada voice; fall back to generic Indian English
+        selectedVoice =
+          voices.find(v => v.lang === "kn-IN" || v.lang.startsWith("kn")) ||
+          voices.find(v => v.lang === "en-IN") ||
+          voices.find(v => v.name.toLowerCase().includes("india")) ||
+          voices[0];
+        utt.lang = "kn-IN";
+      } else {
+        // English: prefer a calm female voice
+        selectedVoice =
+          voices.find(v => v.name.toLowerCase().includes("female")) ||
+          voices.find(v => v.name.toLowerCase().includes("zira")) ||
+          voices.find(v => v.name.toLowerCase().includes("google uk english female")) ||
+          voices.find(v => v.name.toLowerCase().includes("samantha")) ||
+          voices[0];
+        utt.lang = "en-US";
       }
-      
-      utt.rate = 0.9;
-      utt.pitch = 1.2;
+
+      if (selectedVoice) utt.voice = selectedVoice;
+      utt.rate   = 0.9;
+      utt.pitch  = 1.2;
       utt.volume = 1;
-      
+
       utt.onstart = () => setIsSpeaking(true);
       utt.onend   = () => setIsSpeaking(false);
       utt.onerror = () => setIsSpeaking(false);
-      
+
       window.speechSynthesis.speak(utt);
     };
 
@@ -220,7 +298,7 @@ export default function DeluluPage() {
     } else {
       window.speechSynthesis.onvoiceschanged = loadVoicesAndSpeak;
     }
-  }, []);
+  }, [language]);
 
   /* ── stopSpeaking() ── */
   const stopSpeaking = useCallback(() => {
@@ -282,7 +360,7 @@ export default function DeluluPage() {
         const res = await fetch(`${API}/api/delulu/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, message: msg }),
+          body: JSON.stringify({ userId, message: msg, language }),
         });
         const data = await res.json();
 
@@ -322,7 +400,7 @@ export default function DeluluPage() {
         inputRef.current?.focus();
       }
     },
-    [input, loading, userId, wellnessScore, speak],
+    [input, loading, userId, wellnessScore, speak, language],
   );
 
   /* ── startListening() — STT ── */
@@ -337,7 +415,7 @@ export default function DeluluPage() {
     setMicError("");
 
     const rec = new SR();
-    rec.lang = "en-US";
+    rec.lang = language === "kn" ? "kn-IN" : "en-US";
     rec.interimResults = false;
     rec.maxAlternatives = 1;
     recognitionRef.current = rec;
@@ -410,11 +488,27 @@ export default function DeluluPage() {
         </div>
         <div>
           <h1 className="text-2xl font-black text-slate-800">Delulu <span className="text-violet-500">✦</span></h1>
-          <p className="text-sm text-slate-500 font-medium">Your mental health companion — always here to listen</p>
+          <p className="text-sm text-slate-500 font-medium">{t.companion}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-50 border border-violet-100">
-          <Sparkles size={14} className="text-violet-500" />
-          <span className="text-xs font-bold text-violet-600">AI Memory Active</span>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Language toggle */}
+          <button
+            id="delulu-lang-toggle"
+            onClick={toggleLanguage}
+            title="Switch language"
+            className="flex items-center gap-0 rounded-xl border border-violet-200 overflow-hidden text-xs font-bold shadow-sm"
+          >
+            <span className={`px-3 py-1.5 transition-colors ${
+              language === "en" ? "bg-violet-600 text-white" : "bg-white text-slate-500 hover:bg-violet-50"
+            }`}>EN</span>
+            <span className={`px-3 py-1.5 transition-colors ${
+              language === "kn" ? "bg-violet-600 text-white" : "bg-white text-slate-500 hover:bg-violet-50"
+            }`}>ಕನ್ನಡ</span>
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-50 border border-violet-100">
+            <Sparkles size={14} className="text-violet-500" />
+            <span className="text-xs font-bold text-violet-600">AI Memory Active</span>
+          </div>
         </div>
       </div>
 
@@ -435,17 +529,17 @@ export default function DeluluPage() {
               {isSpeaking ? (
                 <p className="text-xs text-violet-500 font-semibold flex items-center gap-1">
                   <Volume2 size={11} className="animate-pulse" />
-                  Delulu is speaking...
+                  {t.speaking}
                 </p>
               ) : isListening ? (
                 <p className="text-xs text-rose-500 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
-                  Listening...
+                  {t.listening}
                 </p>
               ) : (
                 <p className="text-xs text-emerald-500 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                  Online & listening
+                  {t.online}
                 </p>
               )}
             </div>
@@ -553,7 +647,7 @@ export default function DeluluPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); inputModeRef.current = "text"; }}
                 onKeyDown={handleKey}
-                placeholder="How are you feeling today?"
+                placeholder={t.typingPlaceholder}
                 rows={1}
                 disabled={loading || isListening || !userId || userId === "..."}
                 className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100 transition-all disabled:opacity-50 custom-scrollbar"
