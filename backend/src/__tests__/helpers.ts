@@ -137,8 +137,10 @@ export async function insertHospital(overrides?: Partial<IHospital>): Promise<IH
  * Useful for test cleanup between test cases.
  */
 export async function clearDatabase(): Promise<void> {
-  const collections = await Doctor.db.db.listCollections().toArray();
-  for (const collection of collections) {
-    await Doctor.db.db.collection(collection.name).deleteMany({});
+  if (Doctor.db.db) {
+    const collections = await Doctor.db.db.listCollections().toArray();
+    for (const collection of collections) {
+      await Doctor.db.db.collection(collection.name).deleteMany({});
+    }
   }
 }
