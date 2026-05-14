@@ -41,7 +41,10 @@ import reminderRoutes      from './routes/reminderRoutes';
 import voiceBookingRoutes  from './routes/voiceBookingRoutes';
 import placesProxyRoutes   from './routes/placesProxyRoutes';
 import hospitalRoutes      from './routes/hospitalRoutes';
+<<<<<<< HEAD
 import deluluRoutes        from './routes/deluluRoutes';
+=======
+>>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
 
 app.use('/api/auth',            authRoutes);
 app.use('/api/patients',        patientRoutes);
@@ -56,7 +59,10 @@ app.use('/api/reminders',       reminderRoutes);
 app.use('/api/voice-booking',   voiceBookingRoutes);
 app.use('/api/places',          placesProxyRoutes);
 app.use('/api/hospital',        hospitalRoutes);
+<<<<<<< HEAD
 app.use('/api/delulu',          deluluRoutes);
+=======
+>>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
 
 const PORT = process.env.PORT || 5000;
 

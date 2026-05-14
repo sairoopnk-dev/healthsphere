@@ -12,7 +12,11 @@ import PatientModals from "./_components/PatientModals";
 const DASHBOARD_ROUTES = [
   "/patient/overview", "/patient/appointments", "/patient/medical-records",
   "/patient/medications", "/patient/timeline", "/patient/diet-plan", "/patient/messages",
+<<<<<<< HEAD
   "/patient/health-report", "/patient/symptom-checker", "/patient/delulu",
+=======
+  "/patient/health-report", "/patient/symptom-checker",
+>>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
 ];
 
 export default function PatientLayout({ children }: { children: ReactNode }) {
