@@ -75,13 +75,13 @@ Implementation language: **TypeScript** (backend and frontend, matching the exis
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 5. Backend — test scaffolding
-  - [~] 5.1 Install and configure Vitest, fast-check, supertest, mongodb-memory-server
+  - [x] 5.1 Install and configure Vitest, fast-check, supertest, mongodb-memory-server
     - Add dev dependencies in `backend/package.json` and pin exact versions
     - Add a `vitest.config.ts` with the `node` environment and a `test` script
     - Wire a global setup file that boots `mongodb-memory-server` before the suite and tears it down after
     - _Requirements: 11.1_
 
-  - [~] 5.2 Add shared test helpers in `backend/src/__tests__/helpers.ts`
+  - [ ] 5.2 Add shared test helpers in `backend/src/__tests__/helpers.ts`
     - `withApp()` returns a fresh `supertest` agent bound to the Express app used in `index.ts`
     - `issueJwt(payload)` signs a token with the same `JWT_SECRET` the app uses so `requireAuth` accepts it
     - `insertDoctor`, `insertHospital` seed valid fixture records with deterministic ids
@@ -166,7 +166,7 @@ Implementation language: **TypeScript** (backend and frontend, matching the exis
     - For each existing namespace (`/api/doctor`, `/api/appointments`, `/api/patient`, `/api/prescriptions`, `/api/medical-records`, `/api/notifications`) hit one read-only route and assert a 2xx response with an unchanged body shape
     - _Requirements: 11.1, 11.2_
 
-- [~] 9. Checkpoint — backend tests green
+- [ ] 9. Checkpoint — backend tests green
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 10. Frontend — DoctorContext and Role_Router
@@ -277,7 +277,7 @@ Implementation language: **TypeScript** (backend and frontend, matching the exis
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 15. Frontend — test scaffolding
-  - [~] 15.1 Install and configure Vitest, React Testing Library, fast-check, jsdom
+  - [ ] 15.1 Install and configure Vitest, React Testing Library, fast-check, jsdom
     - Add dev dependencies in `frontend/package.json` and pin exact versions
     - Add `vitest.config.ts` with the `jsdom` environment, `@testing-library/jest-dom` setup file, and a `test` script
     - Add shared mocks: `vi.mock('@react-google-maps/api', …)` returning stubbed `LoadScript`/`GoogleMap`/`Marker`, and `vi.mock('next/navigation', …)` returning controllable `useRouter`/`usePathname`
