@@ -141,7 +141,7 @@ function buildConversationContext(
 
 export const deluluChat = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, message } = req.body;
+    const { userId, message, language } = req.body;
 
     if (!message || typeof message !== 'string' || message.trim() === '') {
       res.status(400).json({ success: false, message: '"message" is required' });
@@ -164,14 +164,24 @@ export const deluluChat = async (req: Request, res: Response): Promise<void> => 
     // ── Build AI prompt with history ──
     const historyContext = buildConversationContext(chat.messages as any);
 
+    // ── Language directive: explicit instruction, no keyword hacks ──
+    const lang = language === 'kn' ? 'kn' : 'en';
+    const languageDirective = lang === 'kn'
+      ? 'LANGUAGE INSTRUCTION: You MUST respond entirely in Kannada (ಕನ್ನಡ). Use natural, conversational Kannada. Do NOT mix in English words unless absolutely unavoidable (e.g., medical/technical terms). All emotional warmth, empathy, and personality must come through in Kannada.'
+      : 'LANGUAGE INSTRUCTION: Respond in English as usual.';
+
     const prompt = [
+      languageDirective,
+      '',
       DELULU_SYSTEM,
       '',
       historyContext ? historyContext : '',
       '',
       `New message from user: "${userMessage}"`,
       '',
-      'Respond as Delulu (empathetic, concise, supportive — 2-4 sentences):',
+      lang === 'kn'
+        ? 'Respond as Delulu in Kannada (ಕನ್ನಡ) — empathetic, concise, supportive — 2-4 sentences:'
+        : 'Respond as Delulu (empathetic, concise, supportive — 2-4 sentences):',
     ]
       .filter(Boolean)
       .join('\n');
