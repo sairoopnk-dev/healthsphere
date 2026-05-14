@@ -126,7 +126,16 @@ export default function RegisterPage() {
       // After registration always redirect to profile setup (first login)
       router.push(`/${role}/setup-profile`);
     } catch (err: any) {
-      setError(err.message);
+      let message = "Something went wrong";
+      if (err.code === "auth/email-already-in-use") {
+        message = "User already exists";
+      } else if (err.code === "auth/invalid-email") {
+        message = "Invalid email address";
+      } else if (err.code === "auth/weak-password") {
+        message = "Password should be at least 6 characters";
+      }
+      setError(message);
+      setTimeout(() => setError(""), 3000);
     } finally {
       setLoading(false);
     }
@@ -236,9 +245,9 @@ export default function RegisterPage() {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm font-medium text-center bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
+            <div className="bg-red-100 text-red-600 px-4 py-2 rounded">
               {error}
-            </p>
+            </div>
           )}
 
           <motion.button
