@@ -183,15 +183,43 @@ export default function DeluluPage() {
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, "").trim();
+    
+    let clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, "").trim();
+    clean = clean.replace(/\./g, ". ");
+
     const utt = new SpeechSynthesisUtterance(clean);
-    utt.lang  = "en-US";
-    utt.rate  = 1;
-    utt.pitch = 1;
-    utt.onstart = () => setIsSpeaking(true);
-    utt.onend   = () => setIsSpeaking(false);
-    utt.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utt);
+    
+    const loadVoicesAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoice = voices.find(v => 
+        v.name.toLowerCase().includes("female") ||
+        v.name.toLowerCase().includes("zira") ||
+        v.name.toLowerCase().includes("google uk english female") ||
+        v.name.toLowerCase().includes("samantha")
+      );
+      
+      if (femaleVoice) {
+        utt.voice = femaleVoice;
+      } else if (voices.length > 0) {
+        utt.voice = voices[0];
+      }
+      
+      utt.rate = 0.9;
+      utt.pitch = 1.2;
+      utt.volume = 1;
+      
+      utt.onstart = () => setIsSpeaking(true);
+      utt.onend   = () => setIsSpeaking(false);
+      utt.onerror = () => setIsSpeaking(false);
+      
+      window.speechSynthesis.speak(utt);
+    };
+
+    if (window.speechSynthesis.getVoices().length > 0) {
+      loadVoicesAndSpeak();
+    } else {
+      window.speechSynthesis.onvoiceschanged = loadVoicesAndSpeak;
+    }
   }, []);
 
   /* ── stopSpeaking() ── */
