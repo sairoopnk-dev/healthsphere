@@ -127,11 +127,10 @@ export default function DoctorOverview() {
         ))}
       </div>
 
-<<<<<<< HEAD
       {/* Clinic Location */}
-=======
+
       {/* Clinic Location - Only for ADMIN role */}
->>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
+
       {doctor?.id && (
         <ClinicLocation doctorId={doctor.id} />
       )}

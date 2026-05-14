@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-<<<<<<< HEAD
 import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Stethoscope, Salad, Settings, LogOut, Brain, HeartHandshake } from "lucide-react";
-=======
-import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Stethoscope, Salad, Settings, LogOut, Brain } from "lucide-react";
->>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
 import { usePatient } from "../_context/PatientContext";
 
 const NAV = [
@@ -17,10 +13,7 @@ const NAV = [
   { name: "Timeline",        href: "/patient/timeline",        icon: Activity },
   { name: "Diet Plan",       href: "/patient/diet-plan",       icon: Salad },
   { name: "Health Report",   href: "/patient/health-report",   icon: Brain },
-<<<<<<< HEAD
   { name: "Delulu",          href: "/patient/delulu",          icon: HeartHandshake },
-=======
->>>>>>> e9960024ab9a2e44e5296d21c7026a886be89c93
   { name: "Messages",        href: "/patient/messages",        icon: Mail },
 ];
 
