@@ -138,31 +138,33 @@ export default function PatientOverview() {
               <h3 className="text-xl font-bold text-slate-800">Appointments</h3>
               <button onClick={openAppt} className="bg-teal-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-teal-600 transition-colors">+ Book New</button>
             </div>
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-slate-400 text-xs uppercase tracking-wider border-b border-slate-100">
-                  <th className="pb-3 font-bold">Type</th>
-                  <th className="pb-3 font-bold">Date</th>
-                  <th className="pb-3 font-bold">Doctor</th>
-                  <th className="pb-3 font-bold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="font-semibold text-slate-700">
-                {upcomingAppointments.slice(0, 3).map((a: any, i: number) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                    <td className="py-3">Visit</td>
-                    <td className="py-3">{formatDate(a.date)}</td>
-                    <td className="py-3 truncate max-w-[130px]">{a.doctorName}</td>
-                    <td className="py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-600">{a.status || "Scheduled"}</span>
-                    </td>
+            <div className="overflow-x-auto w-full">
+              <table className="w-full min-w-[500px] text-left text-sm">
+                <thead>
+                  <tr className="text-slate-400 text-xs uppercase tracking-wider border-b border-slate-100">
+                    <th className="pb-3 font-bold">Type</th>
+                    <th className="pb-3 font-bold">Date</th>
+                    <th className="pb-3 font-bold">Doctor</th>
+                    <th className="pb-3 font-bold">Status</th>
                   </tr>
-                ))}
-                {upcomingAppointments.length === 0 && (
-                  <tr><td colSpan={4} className="py-6 text-center text-slate-400 text-xs">No appointments yet. Book one above!</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="font-semibold text-slate-700">
+                  {upcomingAppointments.slice(0, 3).map((a: any, i: number) => (
+                    <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                      <td className="py-3">Visit</td>
+                      <td className="py-3">{formatDate(a.date)}</td>
+                      <td className="py-3 truncate max-w-[130px]">{a.doctorName}</td>
+                      <td className="py-3">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-600">{a.status || "Scheduled"}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {upcomingAppointments.length === 0 && (
+                    <tr><td colSpan={4} className="py-6 text-center text-slate-400 text-xs">No appointments yet. Book one above!</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -176,25 +178,27 @@ export default function PatientOverview() {
             <h3 className="text-xl font-bold text-slate-800">Medical Records</h3>
             <Link href="/patient/medical-records" className="bg-teal-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold hover:bg-teal-600 transition-colors">Browse All</Link>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-slate-400 text-xs uppercase tracking-wider border-b border-slate-100">
-                <th className="pb-3 font-bold">Date</th>
-                <th className="pb-3 font-bold">Name</th>
-              </tr>
-            </thead>
-            <tbody className="font-semibold text-slate-700">
-              {timeline.slice(0, 4).map((r: any, i: number) => (
-                <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 cursor-pointer" onClick={() => setShowRecord(r)}>
-                  <td className="py-3 text-slate-500 whitespace-nowrap">{formatDate(r.date)}</td>
-                  <td className="py-3 truncate max-w-[180px]">{r.title}</td>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[300px] text-left text-sm">
+              <thead>
+                <tr className="text-slate-400 text-xs uppercase tracking-wider border-b border-slate-100">
+                  <th className="pb-3 font-bold">Date</th>
+                  <th className="pb-3 font-bold">Name</th>
                 </tr>
-              ))}
-              {timeline.length === 0 && (
-                <tr><td colSpan={2} className="py-4 text-center text-slate-400 text-xs">No records yet</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="font-semibold text-slate-700">
+                {timeline.slice(0, 4).map((r: any, i: number) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 cursor-pointer" onClick={() => setShowRecord(r)}>
+                    <td className="py-3 text-slate-500 whitespace-nowrap">{formatDate(r.date)}</td>
+                    <td className="py-3 truncate max-w-[180px]">{r.title}</td>
+                  </tr>
+                ))}
+                {timeline.length === 0 && (
+                  <tr><td colSpan={2} className="py-4 text-center text-slate-400 text-xs">No records yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Active Medications — live data */}

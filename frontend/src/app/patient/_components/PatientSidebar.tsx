@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Stethoscope, Salad, Settings, LogOut, Brain, HeartHandshake } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Stethoscope, Salad, Settings, LogOut, Brain, HeartHandshake, X } from "lucide-react";
 import { usePatient } from "../_context/PatientContext";
 
 const NAV = [
@@ -17,22 +17,32 @@ const NAV = [
   { name: "Messages",        href: "/patient/messages",        icon: Mail },
 ];
 
-export default function PatientSidebar() {
+export default function PatientSidebar({ isOpen, setIsOpen }: { isOpen?: boolean; setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
   const { profile, messages, setShowSettings, handleLogout } = usePatient();
   const unreadCount = messages.filter((m: any) => m.isNew).length;
 
   return (
-    <aside className="w-64 flex flex-col shrink-0 border-r" style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}>
+    <aside 
+      className={`fixed md:relative top-0 left-0 h-full z-50 w-64 flex flex-col shrink-0 border-r transform transition-transform duration-300 md:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`} 
+      style={{ background: "#FFFFFF", borderColor: "#E5E7EB" }}
+    >
       {/* ── Logo ─────────────────────────────────────────────────── */}
-      <div className="p-6 flex items-center gap-2.5 border-b" style={{ borderColor: "#F0FDF4" }}>
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md animate-glow-ring-green"
-          style={{ background: "linear-gradient(135deg, #10B981, #06B6D4)" }}
-        >
-          <Activity className="text-white" size={18}/>
+      <div className="p-6 flex items-center justify-between gap-2.5 border-b" style={{ borderColor: "#F0FDF4" }}>
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md animate-glow-ring-green"
+            style={{ background: "linear-gradient(135deg, #10B981, #06B6D4)" }}
+          >
+            <Activity className="text-white" size={18}/>
+          </div>
+          <span className="text-xl font-black tracking-tight" style={{ color: "#10B981" }}>HealthSphere</span>
         </div>
-        <span className="text-xl font-black tracking-tight" style={{ color: "#10B981" }}>HealthSphere</span>
+        {setIsOpen && (
+          <button onClick={() => setIsOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
+            <X size={20} />
+          </button>
+        )}
       </div>
 
       {/* ── Navigation ──────────────────────────────────────────── */}

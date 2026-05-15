@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Salad, Brain, Stethoscope } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Pill, Activity, Mail, LayoutDashboard, Salad, Brain, Stethoscope, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePatient } from "../_context/PatientContext";
 import LanguageSwitcher from "../../../components/LanguageSwitcher";
@@ -36,7 +36,7 @@ function nowTime(): string {
   });
 }
 
-export default function PatientTopbar() {
+export default function PatientTopbar({ toggleSidebar }: { toggleSidebar?: () => void }) {
   const pathname = usePathname();
   const {
     profile, messages, showMessages, setShowMessages,
@@ -50,7 +50,7 @@ export default function PatientTopbar() {
 
   return (
     <header
-      className="px-8 py-4 flex items-center justify-between shrink-0 border-b z-10 relative"
+      className="px-4 md:px-8 py-4 flex items-center justify-between shrink-0 border-b z-10 relative"
       style={{
         background: "rgba(255, 255, 255, 0.85)",
         backdropFilter: "blur(12px)",
@@ -58,10 +58,18 @@ export default function PatientTopbar() {
         borderColor: "rgba(209, 250, 229, 0.5)",
       }}
     >
-      {/* Left: page title */}
+      {/* Left: Hamburger + page title */}
       <div className="flex items-center gap-3">
+        {toggleSidebar && (
+          <button
+            onClick={toggleSidebar}
+            className="md:hidden p-2 -ml-2 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors"
+          >
+            <Menu size={24} />
+          </button>
+        )}
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          className="w-8 h-8 rounded-lg flex items-center justify-center hidden sm:flex"
           style={{ background: "linear-gradient(135deg, #10B981, #06B6D4)" }}
         >
           <PageIcon size={15} className="text-white" />
