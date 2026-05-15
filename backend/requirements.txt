@@ -1,8 +1,10 @@
-# HealthSphere Backend is built with Node.js/Express and TypeScript, NOT Python/FastAPI.
-# Please see package.json for the actual dependencies.
-# You can install them using: npm install
-
-express==5.2.1
-mongoose==9.3.3
-cors==2.8.6
-dotenv==17.4.0
+fastapi==0.135.2
+uvicorn==0.42.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-dotenv==1.2.2
+pymongo==4.16.0
+motor==3.7.1
+requests==2.33.0
+Flask-Bcrypt==1.0.1  # Or passlib depending on your auth implementation
+pyjwt  # Usually needed for auth but was not in your list
