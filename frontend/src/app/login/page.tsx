@@ -353,7 +353,7 @@ export default function LoginPage() {
     <div
       ref={pageRef}
       onMouseMove={handleMouseMove}
-      className="relative min-h-screen w-full flex flex-col lg:flex-row items-center justify-center overflow-x-hidden overflow-y-auto lg:overflow-hidden pt-16 pb-12 lg:py-0"
+      className="relative min-h-screen w-full flex flex-col lg:flex-row items-center justify-start lg:justify-center overflow-x-hidden overflow-y-auto lg:overflow-hidden pt-28 pb-12 lg:py-0"
     >
       {/* ── Navbar ── */}
       <LoginNavbar />
@@ -425,7 +425,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
-        className="relative lg:absolute lg:left-10 lg:top-1/2 lg:-translate-y-1/2 z-10 max-w-xs w-full text-center lg:text-left flex flex-col items-center lg:items-start mb-8 lg:mb-0"
+        className="relative lg:absolute lg:left-10 lg:top-1/2 lg:-translate-y-1/2 z-10 max-w-xs w-full px-4 lg:px-0 text-center lg:text-left flex flex-col items-center lg:items-start mb-8 lg:mb-0"
       >
         <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-3">
           Your Health.
@@ -449,7 +449,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.5 }}
-        className="relative lg:absolute z-10 w-full max-w-[340px] lg:max-w-[420px] mb-12 lg:mb-0 lg:top-1/2 lg:-translate-y-1/2 lg:left-[calc(55%-222px)] lg:-translate-x-[45%]"
+        className="relative lg:absolute z-10 w-[calc(100%-2rem)] mx-auto lg:mx-0 max-w-[340px] lg:max-w-[420px] mb-12 lg:mb-0 lg:top-1/2 lg:-translate-y-1/2 lg:left-[calc(55%-222px)] lg:-translate-x-[45%]"
       >
         <HealthFactsCarousel />
       </motion.div>
@@ -459,7 +459,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-20 w-full max-w-[420px] mx-4 lg:mr-16 lg:ml-auto"
+        className="relative z-20 w-[calc(100%-2rem)] max-w-[420px] mx-auto lg:mr-16 lg:ml-auto"
       >
         <div className="login-glass-card rounded-3xl p-8 lg:p-9">
 
