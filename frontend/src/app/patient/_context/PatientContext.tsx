@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 // ── Helper: calculate age from DOB ──
 function calcAge(dob: string): number | null {

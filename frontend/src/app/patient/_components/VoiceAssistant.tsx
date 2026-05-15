@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, X, Calendar, Clock, Stethoscope, Building2, CheckCircle2, AlertCircle, Loader2, MapPin, Navigation } from "lucide-react";
 import { parseVoiceIntent, type VoiceIntent } from "@/utils/voiceNlp";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type Phase =
   | "idle"

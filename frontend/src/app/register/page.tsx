@@ -50,7 +50,7 @@ export default function RegisterPage() {
       role: storedRole,
     };
 
-    const res = await fetch(`http://localhost:8000/api/auth/${storedRole}/register`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -103,7 +103,7 @@ export default function RegisterPage() {
         contactNumber: formData.contactNumber,
       };
 
-      const res = await fetch(`http://localhost:8000/api/auth/${role}/register`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${role}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

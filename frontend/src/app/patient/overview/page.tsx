@@ -42,7 +42,7 @@ export default function PatientOverview() {
   useEffect(() => {
     const patientId = profile?.patientId || profile?.id;
     if (!patientId || patientId === "...") return;
-    fetch(`http://localhost:8000/api/prescriptions/${patientId}/active`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/prescriptions/${patientId}/active`)
       .then(r => r.json())
       .then(data => {
         if (data.success) setActiveMeds((data.medications || []).slice(0, 3));

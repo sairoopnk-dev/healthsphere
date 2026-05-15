@@ -6,7 +6,7 @@ import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import Toast, { ToastType } from "@/components/ui/Toast";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 const SLOT_TIMES = [
   "09:00 AM","09:30 AM",
   "10:00 AM","10:30 AM",

@@ -251,7 +251,7 @@ export default function PatientTimeline() {
   // Load merged timeline from backend endpoint
   useEffect(() => {
     if (!patientId || patientId === "...") return;
-    fetch(`http://localhost:8000/api/appointments/patient/${patientId}/timeline`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/patient/${patientId}/timeline`)
       .then(r => r.json())
       .then(data => {
         if (data.success && data.data?.length) {

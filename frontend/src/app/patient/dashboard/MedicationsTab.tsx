@@ -131,7 +131,7 @@ function ReminderPickerModal({ med, patientId, existingTimes, onSave, onClose }:
     if (selectedTimes.length === 0) return;
     setSaving(true);
     try {
-      await fetch("http://localhost:8000/api/reminders", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -303,8 +303,8 @@ export default function MedicationsTab({ profile }: MedicationsTabProps) {
     setLoading(true); setError("");
     try {
       const [aRes, pRes] = await Promise.all([
-        fetch(`http://localhost:8000/api/prescriptions/${pid}/active`),
-        fetch(`http://localhost:8000/api/prescriptions/${pid}/past`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/prescriptions/${pid}/active`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/prescriptions/${pid}/past`),
       ]);
       const aData = await aRes.json();
       const pData = await pRes.json();
@@ -319,7 +319,7 @@ export default function MedicationsTab({ profile }: MedicationsTabProps) {
 
   const loadSavedReminders = async (pid: string) => {
     try {
-      const res  = await fetch(`http://localhost:8000/api/reminders/${pid}`);
+      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/${pid}`);
       const data = await res.json();
       if (data.success && data.data?.length) {
         const map: Record<string, string[]> = {};

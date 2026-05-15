@@ -51,7 +51,7 @@ export default function TherapistsPage() {
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/doctor/all")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/doctor/all`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setDoctors(data);
@@ -87,7 +87,7 @@ export default function TherapistsPage() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:8000/api/appointments", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

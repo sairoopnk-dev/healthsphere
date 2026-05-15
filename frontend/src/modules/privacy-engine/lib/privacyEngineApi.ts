@@ -7,7 +7,7 @@ import type {
 } from "../types";
 
 const PE_BASE_URL =
-  process.env.NEXT_PUBLIC_PRIVACY_ENGINE_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_PRIVACY_ENGINE_URL ?? process.env.NEXT_PUBLIC_API_URL!;
 
 export async function generateSyntheticData(
   params: GenerateParams

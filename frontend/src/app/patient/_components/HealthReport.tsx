@@ -39,7 +39,7 @@ export default function HealthReport({ userId }: HealthReportProps) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/api/ai/health-report/${userId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/health-report/${userId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to generate report");
       setReport(data.data);

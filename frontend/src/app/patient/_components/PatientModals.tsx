@@ -173,7 +173,7 @@ export default function PatientModals() {
                 const userStr = localStorage.getItem("user");
                 const patientId = userStr ? JSON.parse(userStr).id : null;
                 try {
-                  const res = await fetch(`http://localhost:8000/api/patients/${patientId}/profile`, {
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/profile`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

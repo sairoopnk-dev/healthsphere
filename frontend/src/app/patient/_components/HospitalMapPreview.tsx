@@ -7,7 +7,7 @@ import {
   MapPin, Navigation, ExternalLink, Building2, AlertCircle, Route,
 } from "lucide-react";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 // ── Types ────────────────────────────────────────────────────────────────────

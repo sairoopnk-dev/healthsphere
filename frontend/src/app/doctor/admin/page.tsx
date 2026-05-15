@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useDoctor } from "../_context/DoctorContext";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type Hospital = {
