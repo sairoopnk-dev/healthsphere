@@ -11,6 +11,7 @@ const connectDB = async () => {
     console.log(`Attempting to connect to MongoDB at ${uri} ...`);
     const conn = await mongoose.connect(uri);
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`   Connected DB: ${mongoose.connection.name}`);
   } catch (error) {
     console.error('Fatal DB error:', error instanceof Error ? error.message : error);
     process.exit(1);
