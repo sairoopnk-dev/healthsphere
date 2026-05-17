@@ -8,6 +8,7 @@ import { Stethoscope, UserRound, ArrowRight, Eye, EyeOff, Activity, Check, Copy 
 import { useEffect } from "react";
 import { createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -83,7 +84,7 @@ export default function RegisterPage() {
         setError("Popup blocked or closed. Switching to secure redirect...");
         signInWithRedirect(auth, provider);
       } else {
-        setError("Sign-up failed. Please try again.");
+        setError(getAuthErrorMessage(err));
         setLoading(false);
       }
     }
@@ -91,6 +92,10 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name || !formData.email || !formData.password || !formData.contactNumber) {
+      setError("Please fill all required fields");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -124,18 +129,10 @@ export default function RegisterPage() {
       }
 
       // After registration always redirect to profile setup (first login)
+      setError("");
       router.push(`/${role}/setup-profile`);
     } catch (err: any) {
-      let message = "Something went wrong";
-      if (err.code === "auth/email-already-in-use") {
-        message = "User already exists";
-      } else if (err.code === "auth/invalid-email") {
-        message = "Invalid email address";
-      } else if (err.code === "auth/weak-password") {
-        message = "Password should be at least 6 characters";
-      }
-      setError(message);
-      setTimeout(() => setError(""), 3000);
+      setError(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -202,7 +199,7 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-1.5">Full Name *</label>
             <input
-              type="text" name="name" required onChange={handleChange}
+              type="text" name="name" onChange={handleChange}
               placeholder="John Doe"
               className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-white placeholder-slate-500 font-medium transition-all"
             />
@@ -211,7 +208,7 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-1.5">Email *</label>
             <input
-              type="email" name="email" required onChange={handleChange}
+              type="email" name="email" onChange={handleChange}
               placeholder="name@email.com"
               className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-white placeholder-slate-500 font-medium transition-all"
             />
@@ -221,7 +218,7 @@ export default function RegisterPage() {
             <label className="block text-sm font-semibold text-slate-300 mb-1.5">Password *</label>
             <div className="relative">
               <input
-                type={showPassword ? "text" : "password"} name="password" required onChange={handleChange}
+                type={showPassword ? "text" : "password"} name="password" onChange={handleChange}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-white placeholder-slate-500 font-medium transition-all"
               />
@@ -238,7 +235,7 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-semibold text-slate-300 mb-1.5">Phone Number *</label>
             <input
-              type="tel" name="contactNumber" required onChange={handleChange}
+              type="tel" name="contactNumber" onChange={handleChange}
               placeholder="+91 98765 43210"
               className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-white placeholder-slate-500 font-medium transition-all"
             />

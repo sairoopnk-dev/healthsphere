@@ -32,6 +32,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import LoginNavbar from "./_components/LoginNavbar";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 
 /* ─── health facts data ─── */
 const healthFacts = [
@@ -316,14 +317,19 @@ export default function LoginPage() {
         setError("Popup blocked. Switching to redirect…");
         signInWithRedirect(auth, provider);
       } else {
-        setError("Sign-in failed. Please try again.");
+        setError(getAuthErrorMessage(err));
         setLoading(false);
       }
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true); setError("");
+    e.preventDefault();
+    if (!email || !password) {
+      setError("Please fill all required fields");
+      return;
+    }
+    setLoading(true); setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
@@ -341,8 +347,9 @@ export default function LoginPage() {
       else if (role === "doctor" && data.hospitalId == null) router.push("/doctor/setup-hospital");
       else if (role === "patient") router.push("/patient/overview");
       else router.push("/doctor/overview");
+      setError("");
     } catch (err: any) {
-      setError(err.message);
+      setError(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -515,7 +522,6 @@ export default function LoginPage() {
               </label>
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="login-input"
@@ -531,7 +537,6 @@ export default function LoginPage() {
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="login-input pr-11"
