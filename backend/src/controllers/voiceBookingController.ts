@@ -14,35 +14,90 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ── Pure-TS Levenshtein similarity (0.0 → 1.0) ────────────────────────────────
+function similarity(a: string, b: string): number {
+  const s = a.toLowerCase(), t = b.toLowerCase();
+  if (s === t) return 1;
+  const m = s.length, n = t.length;
+  if (!m || !n) return 0;
+  // dp[i][j] = edit distance between s[0..i-1] and t[0..j-1]
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = s[i - 1] === t[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return 1 - dp[m][n] / Math.max(m, n);
+}
+
+/**
+ * Score a spoken name fragment against a full doctor name stored in the DB.
+ * Checks: exact token match, prefix match, any-token similarity.
+ * Returns the highest score found (0.0 → 1.0).
+ */
+function nameSimilarity(spoken: string, dbName: string): number {
+  const spokenClean = spoken.toLowerCase().replace(/^(dr\.?\s*)/i, '').trim();
+  const dbClean = dbName.toLowerCase().replace(/^(dr\.?\s*)/i, '').trim();
+
+  // Direct similarity on full cleaned strings
+  const fullScore = similarity(spokenClean, dbClean);
+
+  // Also compare spoken fragment against EACH token in the DB name
+  const dbTokens = dbClean.split(/\s+/);
+  const tokenScore = Math.max(...dbTokens.map(tok => similarity(spokenClean, tok)));
+
+  // Also compare first token of spoken against first token of DB (handles short names)
+  const spokenFirst = spokenClean.split(/\s+/)[0];
+  const dbFirst = dbTokens[0];
+  const firstScore = similarity(spokenFirst, dbFirst);
+
+  return Math.max(fullScore, tokenScore, firstScore);
+}
+
 // ─── Search doctors by name, specialty, and/or hospital ───────────────────────
 export const searchDoctors = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, specialty, hospital } = req.body;
 
-    const query: any = {};
+    const query: any = { isProfileCompleted: true };
 
+    if (specialty) query.specialization = { $regex: new RegExp(specialty, 'i') };
+    if (hospital)  query.hospital       = { $regex: new RegExp(hospital, 'i') };
+
+    // ── Step 1: Try regex search for exact / prefix match ──────────────────────
     if (name) {
-      // Fuzzy match: "Dr Ravi" matches "Dr. Ravindra Kumar"
-      const parts = name.replace(/^dr\.?\s*/i, '').trim().split(/\s+/);
+      const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
+      const parts = cleanName.split(/\s+/);
       const pattern = parts.map((p: string) => `(?=.*${p})`).join('');
       query.name = { $regex: new RegExp(pattern, 'i') };
     }
 
-    if (specialty) {
-      query.specialization = { $regex: new RegExp(specialty, 'i') };
-    }
-
-    if (hospital) {
-      query.hospital = { $regex: new RegExp(hospital, 'i') };
-    }
-
-    // Only return doctors with completed profiles
-    query.isProfileCompleted = true;
-
-    const doctors = await Doctor.find(query)
+    let doctors = await Doctor.find(query)
       .select('doctorId name specialization hospital experience qualification gender')
       .limit(20)
       .lean();
+
+    // ── Step 2: If regex returned nothing AND we have a name, do fuzzy fallback ─
+    if (name && doctors.length === 0) {
+      const { name: _n, ...queryWithoutName } = query;   // drop name filter
+      const allDoctors = await Doctor.find(queryWithoutName)
+        .select('doctorId name specialization hospital experience qualification gender')
+        .lean();
+
+      const FUZZY_THRESHOLD = 0.45;   // accepts "Shiroop"→"Sairoop", "Ram"→"Ramesh"
+
+      const scored = allDoctors
+        .map((doc: any) => ({ doc, score: nameSimilarity(name, doc.name) }))
+        .filter(({ score }) => score >= FUZZY_THRESHOLD)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+      doctors = scored.map(({ doc }) => doc);
+    }
 
     res.json({ success: true, doctors });
   } catch (error) {
@@ -50,6 +105,7 @@ export const searchDoctors = async (req: Request, res: Response): Promise<void> 
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
 
 // ─── Check availability for a doctor on a specific date/time ──────────────────
 export const checkAvailability = async (req: Request, res: Response): Promise<void> => {
