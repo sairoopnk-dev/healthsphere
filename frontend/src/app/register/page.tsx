@@ -9,6 +9,8 @@ import { useEffect } from "react";
 import { createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,7 @@ export default function RegisterPage() {
       role: storedRole,
     };
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
+    const res = await fetch(`${apiUrl}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -95,7 +97,15 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      try {
+        await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      } catch (firebaseErr: any) {
+        // If the email is already in use in Firebase, proceed anyway to verify/create in MongoDB
+        if (firebaseErr.code !== "auth/email-already-in-use") {
+          throw firebaseErr;
+        }
+      }
+
       const payload = {
         name:          formData.name,
         email:         formData.email,
@@ -103,7 +113,7 @@ export default function RegisterPage() {
         contactNumber: formData.contactNumber,
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${role}/register`, {
+      const res = await fetch(`${apiUrl}/api/auth/${role}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -127,12 +137,14 @@ export default function RegisterPage() {
       router.push(`/${role}/setup-profile`);
     } catch (err: any) {
       let message = "Something went wrong";
-      if (err.code === "auth/email-already-in-use") {
+      if (err.code === "auth/email-already-in-use" || err.message === "User already exists") {
         message = "User already exists";
       } else if (err.code === "auth/invalid-email") {
         message = "Invalid email address";
       } else if (err.code === "auth/weak-password") {
         message = "Password should be at least 6 characters";
+      } else {
+        message = err.message || message;
       }
       setError(message);
       setTimeout(() => setError(""), 3000);

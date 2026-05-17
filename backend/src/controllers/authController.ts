@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import Patient from '../models/Patient';
 import Doctor from '../models/Doctor';
+import mongoose from 'mongoose';
 import generateToken from '../utils/generateToken';
 
 // ── DOCTOR ID GENERATION (bounded retry) ────────────────────────────────────
@@ -20,15 +21,26 @@ async function generateUniqueDoctorId(): Promise<string> {
 // ── PATIENT REGISTER (minimal – profile completed later) ────────────────────
 export const registerPatient = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, contactNumber } = req.body;
+    let { name, email, password, contactNumber } = req.body;
+
+    console.log("Connected DB:", mongoose.connection.name);
+    console.log("URI:", process.env.MONGO_URI || process.env.MONGODB_URI);
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
       return;
     }
 
+    email = email.toLowerCase().trim();
+    console.log("Incoming email:", email);
+
     const patientExists = await Patient.findOne({ email });
-    if (patientExists) { res.status(400).json({ message: 'Patient already exists' }); return; }
+    console.log("Existing user:", patientExists);
+
+    if (patientExists) {
+      res.status(400).json({ message: 'User already exists' });
+      return;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -58,15 +70,26 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
 // ── DOCTOR REGISTER (minimal – profile completed later) ─────────────────────
 export const registerDoctor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, contactNumber } = req.body;
+    let { name, email, password, contactNumber } = req.body;
+
+    console.log("Connected DB:", mongoose.connection.name);
+    console.log("URI:", process.env.MONGO_URI || process.env.MONGODB_URI);
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
       return;
     }
 
+    email = email.toLowerCase().trim();
+    console.log("Incoming email:", email);
+
     const doctorExists = await Doctor.findOne({ email });
-    if (doctorExists) { res.status(400).json({ message: 'Doctor already exists' }); return; }
+    console.log("Existing user:", doctorExists);
+
+    if (doctorExists) {
+      res.status(400).json({ message: 'User already exists' });
+      return;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -98,7 +121,11 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, role } = req.body;
+    let { email, password, role } = req.body;
+
+    if (email) {
+      email = email.toLowerCase().trim();
+    }
 
     let user: any = null;
     if (role === 'doctor') {

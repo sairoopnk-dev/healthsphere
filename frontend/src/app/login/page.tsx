@@ -34,6 +34,8 @@ import { auth } from "@/lib/firebase";
 import LoginNavbar from "./_components/LoginNavbar";
 
 /* ─── health facts data ─── */
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 const healthFacts = [
   {
     icon: Droplets,
@@ -270,7 +272,7 @@ export default function LoginPage() {
 
   const processGoogleLoginResult = async (result: any) => {
     const storedRole = localStorage.getItem("pendingGoogleRole") || role;
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
+    await fetch(`${apiUrl}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
@@ -281,7 +283,7 @@ export default function LoginPage() {
         role: storedRole,
       }),
     });
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+    const res = await fetch(`${apiUrl}/api/auth/login`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email: result.user.email, password: "google_login_dummy_password", role: storedRole }),
@@ -326,7 +328,7 @@ export default function LoginPage() {
     e.preventDefault(); setLoading(true); setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, password, role }),
