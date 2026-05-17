@@ -33,7 +33,7 @@ export default function AIEvolution({ userId, compact = false }: AIEvolutionProp
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
-    fetch(`http://localhost:8000/api/ai/evolution/${userId}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/evolution/${userId}`)
       .then(res => res.json())
       .then(data => {
         if (data.success) setEvolution(data.data);

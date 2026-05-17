@@ -15,8 +15,13 @@ connectDB().then(() => {
 
 const app = express();
 
-// Middleware
-app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001'], credentials: true }));
+// Middleware - Allow all origins for Vercel deployment (mirrors origin to support credentials)
+app.use(cors({ 
+  origin: true, 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(cookieParser());
 

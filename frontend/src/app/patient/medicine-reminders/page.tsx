@@ -72,7 +72,7 @@ export default function MedicineRemindersPage() {
     if (!patientId) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/reminders/${patientId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/${patientId}`);
       const data = await res.json();
       if (data.success) setReminders(data.data);
     } catch { /* offline */ }
@@ -133,7 +133,7 @@ export default function MedicineRemindersPage() {
 
     setAdding(true);
     try {
-      const res = await fetch("http://localhost:8000/api/reminders", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patientId, medicineName: name.trim(), dosage: dosage.trim(), times, notes: notes.trim(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
@@ -150,7 +150,7 @@ export default function MedicineRemindersPage() {
   // ─── Delete Reminder ─────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`http://localhost:8000/api/reminders/${id}`, { method: "DELETE" });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/${id}`, { method: "DELETE" });
       setReminders((prev) => prev.filter((r) => r._id !== id));
     } catch { /* ignore */ }
   };

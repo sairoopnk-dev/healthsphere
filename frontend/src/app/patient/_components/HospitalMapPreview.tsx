@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from "@react-google-maps/api";
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MapPin, Navigation, ExternalLink, Building2, AlertCircle, Route,
+  MapPin, Navigation, ExternalLink, Building2, AlertCircle, Route, Search, X,
 } from "lucide-react";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const LIBRARIES: ("places")[] = ["places"];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface HospitalMapPreviewProps {
@@ -112,6 +114,62 @@ function FallbackCard({
   );
 }
 
+// ── Map Search Component ───────────────────────────────────────────────────────
+function MapSearchBox({ onSelect, onClose }: { onSelect: (lat: number, lng: number) => void, onClose: () => void }) {
+  const { ready, value, suggestions: { status, data }, setValue, clearSuggestions } = usePlacesAutocomplete({
+    requestOptions: { types: ["establishment", "geocode"] }, // Match requirements
+    debounce: 300,
+  });
+
+  const handleSelect = async (description: string) => {
+    setValue(description, false);
+    clearSuggestions();
+    try {
+      const results = await getGeocode({ address: description });
+      const { lat, lng } = await getLatLng(results[0]);
+      onSelect(lat, lng);
+    } catch (err) {
+      console.error("Geocoding failed:", err);
+    }
+  };
+
+  return (
+    <div className="relative w-64 bg-white/95 backdrop-blur-sm shadow-xl rounded-xl border border-slate-200 overflow-visible">
+      <div className="flex items-center px-2 py-1.5">
+        <Search size={14} className="text-slate-400 ml-1 mr-2" />
+        <input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={!ready}
+          placeholder="Search locations..."
+          className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-slate-700 placeholder-slate-400 min-w-0"
+        />
+        <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors shrink-0">
+          <X size={14} />
+        </button>
+      </div>
+
+      {status === "OK" && (
+        <ul className="absolute top-full right-0 w-72 mt-2 bg-white border border-slate-200 shadow-xl rounded-xl max-h-48 overflow-y-auto z-50 py-1">
+          {data.map(({ place_id, description }) => (
+            <li key={place_id}>
+              <button
+                type="button"
+                onClick={() => handleSelect(description)}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-teal-600 transition-colors flex items-start gap-2"
+              >
+                <MapPin size={12} className="shrink-0 mt-0.5 text-slate-400" />
+                <span className="truncate">{description}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Main Component
 // ══════════════════════════════════════════════════════════════════════════════
@@ -127,7 +185,12 @@ export default function HospitalMapPreview({
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: MAPS_KEY,
     id: "healthsphere-maps",
+    libraries: LIBRARIES,
   });
+
+  // ── Map search (re-center without losing hospital marker) ──────────────────
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // ── Fetch hospital location ────────────────────────────────────────────────
   const fetchLocation = useCallback(async () => {
@@ -221,11 +284,12 @@ export default function HospitalMapPreview({
       <div className={`relative ${compact ? "h-44" : "h-56"}`}>
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
-          center={{ lat: location.lat, lng: location.lng }}
+          center={mapCenter ?? { lat: location.lat, lng: location.lng }}
           zoom={15}
           onLoad={() => setMapReady(true)}
           options={{ disableDefaultUI: true, zoomControl: true, styles: MAP_STYLES, gestureHandling: "cooperative" }}
         >
+          {/* Always show hospital marker */}
           {mapReady && (
             <Marker
               position={{ lat: location.lat, lng: location.lng }}
@@ -247,6 +311,37 @@ export default function HospitalMapPreview({
             </InfoWindow>
           )}
         </GoogleMap>
+
+        {/* ── Floating map search (overlaid on top-right of map) ── */}
+        {mapReady && (
+          <div className="absolute top-2 right-2 z-10">
+            {!searchOpen ? (
+              <button
+                onClick={() => setSearchOpen(true)}
+                title="Search on map"
+                className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-md rounded-xl px-3 py-2 text-xs font-bold text-slate-600 hover:bg-white hover:text-teal-600 transition-all"
+              >
+                <Search size={12} /> Search
+              </button>
+            ) : (
+              <MapSearchBox
+                onSelect={(lat, lng) => { setMapCenter({ lat, lng }); setSearchOpen(false); }}
+                onClose={() => setSearchOpen(false)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Reset to hospital button when map has been moved via search */}
+        {mapCenter && mapReady && (
+          <button
+            onClick={() => setMapCenter(null)}
+            className="absolute bottom-2 left-2 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-md rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-teal-600 hover:bg-white transition-all"
+          >
+            <MapPin size={10} /> Back to hospital
+          </button>
+        )}
+
         <AnimatePresence>
           {!mapReady && (
             <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}

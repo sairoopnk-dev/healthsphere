@@ -137,7 +137,7 @@ export default function DietPlanTab({ profile, onProfileUpdate }: DietPlanTabPro
     const patientId = profile?.patientId || profile?.id;
     if (patientId) {
       setSymptomsLoading(true);
-      fetch(`http://localhost:8000/api/diet-plans/${patientId}/recent-symptoms`)
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/diet-plans/${patientId}/recent-symptoms`)
         .then(r => r.json())
         .then(data => {
           if (data.success && data.symptoms?.length > 0) {
@@ -153,7 +153,7 @@ export default function DietPlanTab({ profile, onProfileUpdate }: DietPlanTabPro
     const patientId = profile?.patientId || profile?.id;
     if (!patientId) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/diet-plans/${patientId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/diet-plans/${patientId}`);
       const data = await res.json();
       if (data.success && data.plan) {
         setSavedPlan(data.plan);
@@ -182,7 +182,7 @@ export default function DietPlanTab({ profile, onProfileUpdate }: DietPlanTabPro
     setPatchSaving(true);
     try {
       const patientId = profile?.patientId || profile?.id;
-      const res = await fetch(`http://localhost:8000/api/diet-plans/${patientId}/update-profile`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/diet-plans/${patientId}/update-profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ height: h, weight: w }),
@@ -214,7 +214,7 @@ export default function DietPlanTab({ profile, onProfileUpdate }: DietPlanTabPro
     setGenError("");
     try {
       const patientId = profile?.patientId || profile?.id;
-      const res = await fetch(`http://localhost:8000/api/diet-plans/${patientId}/generate`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/diet-plans/${patientId}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...prefs, useSymptoms }),

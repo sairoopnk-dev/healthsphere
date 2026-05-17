@@ -59,7 +59,7 @@ export default function MemoryInsights({ userId }: MemoryInsightsProps) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/api/ai/insights/${userId}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/insights/${userId}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to fetch insights");
       setData(json.data);

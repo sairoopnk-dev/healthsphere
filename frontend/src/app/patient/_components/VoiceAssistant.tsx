@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, X, Calendar, Clock, Stethoscope, Building2, CheckCircle2, AlertCircle, Loader2, MapPin, Navigation } from "lucide-react";
 import { parseVoiceIntent, type VoiceIntent } from "@/utils/voiceNlp";
+import { useWebSpeech } from "@/hooks/useWebSpeech";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type Phase =
   | "idle"
@@ -43,7 +44,6 @@ interface Props {
 
 export default function VoiceAssistant({ onClose, onBooked }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [transcript, setTranscript] = useState("");
   const [statusText, setStatusText] = useState("Tap the mic to start");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -61,10 +61,13 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
   const [nearestResults, setNearestResults] = useState<NearestDoctorResult[]>([]);
   const [nearestSpecialty, setNearestSpecialty] = useState("");
 
-  // Speech recognition
-  const recognitionRef = useRef<any>(null);
-  const isListeningRef = useRef(false);
-  const finalTranscriptRef = useRef("");
+  // ── Web Speech API (STT + TTS) ──
+  const {
+    isListening, transcript, finalTranscript,
+    startListening: wsStart, stopListening: wsStop, resetTranscript,
+    sttSupported, sttError,
+    isSpeaking, speak, cancelSpeech,
+  } = useWebSpeech({ lang: "en-US", continuous: true, interimResults: true });
 
   // Patient info
   const getPatient = () => {
@@ -74,37 +77,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
     return { id: u.id || u.patientId || "", name: u.name || "" };
   };
 
-  // ── TTS: Voice Confirmation ──
-  const speakText = useCallback((text: string, onEnd?: () => void) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      console.warn("[VoiceAssistant] SpeechSynthesis not supported.");
-      onEnd?.();
-      return;
-    }
-    // Cancel any previous speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-
-    // Select best English voice (prefer female)
-    const voices = window.speechSynthesis.getVoices();
-    const englishVoices = voices.filter(v => v.lang.startsWith("en"));
-    const femaleVoice = englishVoices.find(v =>
-      /female|zira|samantha|google.*us.*female|microsoft.*zira/i.test(v.name)
-    );
-    const naturalVoice = englishVoices.find(v => !v.localService) || englishVoices[0];
-    utterance.voice = femaleVoice || naturalVoice || null;
-
-    utterance.onend = () => onEnd?.();
-    utterance.onerror = () => onEnd?.();
-
-    window.speechSynthesis.speak(utterance);
-  }, []);
-
+  // ── TTS helpers (powered by Web Speech API via hook) ──
   const speakBookingConfirmation = useCallback((appt: any) => {
     const docName = appt.doctorName || "your doctor";
     const dateStr = new Date(appt.date + "T00:00:00").toLocaleDateString("en-US", {
@@ -115,98 +88,58 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
 
     setPhase("speaking");
     setStatusText("Speaking confirmation...");
-    speakText(message, () => {
+    speak(message, () => {
       setPhase("success");
       setStatusText("Booking confirmed.");
     });
-  }, [speakText]);
+  }, [speak]);
 
   const speakBookingError = useCallback((msg?: string) => {
     const message = msg || "Sorry, the appointment could not be booked. Please try another slot.";
-    speakText(message);
-  }, [speakText]);
+    speak(message);
+  }, [speak]);
 
-  // Preload voices (Chrome loads them async)
+  // ── Web Speech API: Sync hook state → component phases ──
   useEffect(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
-  }, []);
-
-  // ── Speech Recognition Setup ──
-  const startListening = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setErrorMsg("Speech recognition is not supported in this browser. Please use Chrome.");
-      setPhase("error");
-      return;
-    }
-
-    finalTranscriptRef.current = "";
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = true;
-
-    recognition.onstart = () => {
-      isListeningRef.current = true;
+    if (isListening) {
       setPhase("listening");
       setStatusText("Listening...");
       setErrorMsg("");
-    };
+    }
+  }, [isListening]);
 
-    recognition.onresult = (event: any) => {
-      let interim = "";
-      let final = "";
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
-      }
-      const display = final || interim;
-      setTranscript(display);
-      if (final) finalTranscriptRef.current = final;
-    };
+  // When listening stops and we have a final transcript, process it
+  useEffect(() => {
+    if (!isListening && finalTranscript.trim()) {
+      handleTranscript(finalTranscript.trim());
+    } else if (!isListening && phase === "listening") {
+      setPhase("idle");
+      setStatusText("Tap the mic to start");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isListening, finalTranscript]);
 
-    recognition.onend = () => {
-      isListeningRef.current = false;
-      const text = finalTranscriptRef.current.trim();
-      if (text) {
-        handleTranscript(text);
-      } else {
-        setPhase("idle");
-        setStatusText("Tap the mic to start");
-      }
-    };
+  // Propagate STT errors from hook
+  useEffect(() => {
+    if (sttError) {
+      setErrorMsg(sttError);
+      setPhase("error");
+    }
+  }, [sttError]);
 
-    recognition.onerror = (event: any) => {
-      isListeningRef.current = false;
-      if (event.error === "not-allowed") {
-        setErrorMsg("Microphone permission denied — please allow mic access in your browser settings.");
-        setPhase("error");
-      } else if (event.error === "no-speech") {
-        setPhase("idle");
-        setStatusText("No speech detected. Tap to try again.");
-      } else {
-        setErrorMsg(`Speech error: ${event.error}`);
-        setPhase("error");
-      }
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, []);
+  const startListening = useCallback(() => {
+    if (!sttSupported) {
+      setErrorMsg("Web Speech API is not supported in this browser. Please use Chrome.");
+      setPhase("error");
+      return;
+    }
+    resetTranscript();
+    wsStart();
+  }, [sttSupported, resetTranscript, wsStart]);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListeningRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-  }, []);
+    wsStop();
+  }, [wsStop]);
 
   // ── Handle final transcript ──
   const handleTranscript = async (text: string) => {
@@ -234,7 +167,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
       case "confirm_no":
         setPhase("idle");
         setStatusText("Cancelled. Tap the mic for a new command.");
-        setTranscript("");
+        resetTranscript();
         setConfirmMsg("");
         break;
       case "unknown":
@@ -501,6 +434,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
         setStatusText("Appointment booked!");
         onBooked(data.appointment);
         // Speak confirmation aloud
+        // Web Speech API TTS confirmation
         speakBookingConfirmation(data.appointment);
       } else if (res.status === 409) {
         setAvailableSlots(data.alternativeSlots || []);
@@ -570,20 +504,18 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
     if (phase === "listening") {
       stopListening();
     } else {
-      setTranscript("");
+      resetTranscript();
       startListening();
     }
   };
 
-  // Cleanup on unmount
+  // Cleanup on unmount (hook handles its own cleanup)
   useEffect(() => {
     return () => {
       stopListening();
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeech();
     };
-  }, [stopListening]);
+  }, [stopListening, cancelSpeech]);
 
   const formatDisplayDate = (d: string) => {
     if (!d) return "";
@@ -603,7 +535,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
     >
       {/* Close button */}
       <button
-        onClick={() => { stopListening(); onClose(); }}
+        onClick={() => { stopListening(); cancelSpeech(); onClose(); }}
         className="absolute top-6 right-6 p-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors z-10"
       >
         <X size={20} className="text-white" />
@@ -618,7 +550,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
       {/* ── Center Orb Area ── */}
       <div className="relative flex flex-col items-center gap-8">
         {/* Animated rings */}
-        {(phase === "listening" || phase === "processing" || phase === "booking" || phase === "speaking") && (
+        {(phase === "listening" || phase === "processing" || phase === "booking" || phase === "speaking" || isSpeaking) && (
           <>
             <div className="absolute w-48 h-48 rounded-full border border-teal-500/20 animate-ping" style={{ animationDuration: "2s" }} />
             <div className="absolute w-64 h-64 rounded-full border border-teal-500/10 animate-ping" style={{ animationDuration: "3s" }} />
@@ -642,9 +574,9 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
                 ? "bg-gradient-to-br from-red-400 to-rose-500 shadow-red-500/40"
                 : "bg-gradient-to-br from-slate-600 to-slate-700 shadow-slate-500/20 hover:from-teal-500 hover:to-emerald-600"
             }`}
-            disabled={phase === "processing" || phase === "booking" || phase === "speaking"}
+            disabled={phase === "processing" || phase === "booking" || phase === "speaking" || isSpeaking}
           >
-            {phase === "processing" || phase === "booking" || phase === "speaking" ? (
+            {phase === "processing" || phase === "booking" || phase === "speaking" || isSpeaking ? (
               <Loader2 size={36} className="text-white animate-spin" />
             ) : phase === "listening" ? (
               <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}>
@@ -676,7 +608,7 @@ export default function VoiceAssistant({ onClose, onBooked }: Props) {
               <p className="text-slate-300"><Clock size={14} className="inline mr-2 text-teal-400" />{bookedAppt.timeSlot}</p>
             </div>
             <button
-              onClick={() => { stopListening(); onClose(); }}
+              onClick={() => { stopListening(); cancelSpeech(); onClose(); }}
               className="w-full py-3 bg-teal-500 hover:bg-teal-600 text-white font-bold rounded-2xl transition-colors"
             >
               Done

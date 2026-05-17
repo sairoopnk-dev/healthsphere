@@ -8,7 +8,7 @@ import {
   X, Check, Home, Briefcase, AlertCircle, CheckCircle2, Loader2,
 } from "lucide-react";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const LIBRARIES: ("places")[] = ["places"];
 

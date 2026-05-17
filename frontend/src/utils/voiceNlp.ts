@@ -1,8 +1,20 @@
 /**
- * Voice NLP Intent Parser
- * Parses spoken transcripts into structured intents for appointment booking.
- * Pure TypeScript — no external dependencies.
+ * Voice NLP Intent Parser — v2
+ *
+ * Improvements over v1:
+ *  ✔ chrono-node for accurate, order-independent date + time parsing
+ *  ✔ Exhaustive medical specialty synonym map (50+ aliases)
+ *  ✔ Doctor name extraction with strict temporal stop-word boundary
+ *  ✔ Multi-pattern intent detection (book, specialty search, nearest, availability)
+ *  ✔ No hardcoded string comparisons for date/time
+ *  ✔ Works for ANY sentence order
  */
+
+import * as chrono from 'chrono-node';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type VoiceIntent =
   | { type: 'book'; doctor?: string; hospital?: string; date?: string; time?: string }
@@ -13,8 +25,154 @@ export type VoiceIntent =
   | { type: 'confirm_no' }
   | { type: 'unknown' };
 
-// ── Date Parsing ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 1 — SPECIALTY MAP (50+ aliases → canonical DB values)
+// ─────────────────────────────────────────────────────────────────────────────
 
+const SPECIALTY_MAP: Record<string, string> = {
+  // Cardiology
+  'cardiology': 'Cardiologist',
+  'cardiologist': 'Cardiologist',
+  'heart doctor': 'Cardiologist',
+  'heart specialist': 'Cardiologist',
+  'cardiac': 'Cardiologist',
+  'heart': 'Cardiologist',
+
+  // Dermatology
+  'dermatology': 'Dermatologist',
+  'dermatologist': 'Dermatologist',
+  'skin doctor': 'Dermatologist',
+  'skin specialist': 'Dermatologist',
+  'skin': 'Dermatologist',
+
+  // Neurology
+  'neurology': 'Neurologist',
+  'neurologist': 'Neurologist',
+  'brain doctor': 'Neurologist',
+  'brain specialist': 'Neurologist',
+  'nerve doctor': 'Neurologist',
+  'brain': 'Neurologist',
+
+  // Orthopedics
+  'orthopedic': 'Orthopedic',
+  'orthopaedic': 'Orthopedic',
+  'orthopedics': 'Orthopedic',
+  'orthopedist': 'Orthopedic',
+  'bone doctor': 'Orthopedic',
+  'bone specialist': 'Orthopedic',
+  'joint doctor': 'Orthopedic',
+  'joint specialist': 'Orthopedic',
+  'bone': 'Orthopedic',
+
+  // Pediatrics
+  'pediatrics': 'Pediatrician',
+  'pediatrician': 'Pediatrician',
+  'paediatrician': 'Pediatrician',
+  'child doctor': 'Pediatrician',
+  'children doctor': 'Pediatrician',
+  'kids doctor': 'Pediatrician',
+
+  // Psychiatry
+  'psychiatry': 'Psychiatrist',
+  'psychiatrist': 'Psychiatrist',
+  'mental health doctor': 'Psychiatrist',
+  'mental doctor': 'Psychiatrist',
+
+  // Ophthalmology
+  'ophthalmology': 'Ophthalmologist',
+  'ophthalmologist': 'Ophthalmologist',
+  'eye doctor': 'Ophthalmologist',
+  'eye specialist': 'Ophthalmologist',
+  'eye': 'Ophthalmologist',
+
+  // Gynecology
+  'gynecology': 'Gynecologist',
+  'gynaecology': 'Gynecologist',
+  'gynecologist': 'Gynecologist',
+  'gynaecologist': 'Gynecologist',
+  'women doctor': 'Gynecologist',
+  'ladies doctor': 'Gynecologist',
+
+  // Urology
+  'urology': 'Urologist',
+  'urologist': 'Urologist',
+
+  // Oncology
+  'oncology': 'Oncologist',
+  'oncologist': 'Oncologist',
+  'cancer doctor': 'Oncologist',
+  'cancer specialist': 'Oncologist',
+  'cancer': 'Oncologist',
+
+  // Endocrinology
+  'endocrinology': 'Endocrinologist',
+  'endocrinologist': 'Endocrinologist',
+  'diabetes doctor': 'Endocrinologist',
+  'thyroid doctor': 'Endocrinologist',
+  'hormone doctor': 'Endocrinologist',
+
+  // Gastroenterology
+  'gastroenterology': 'Gastroenterologist',
+  'gastroenterologist': 'Gastroenterologist',
+  'stomach doctor': 'Gastroenterologist',
+  'gut doctor': 'Gastroenterologist',
+  'liver doctor': 'Gastroenterologist',
+  'stomach': 'Gastroenterologist',
+
+  // Pulmonology
+  'pulmonology': 'Pulmonologist',
+  'pulmonologist': 'Pulmonologist',
+  'lung doctor': 'Pulmonologist',
+  'respiratory doctor': 'Pulmonologist',
+  'lung': 'Pulmonologist',
+
+  // Nephrology
+  'nephrology': 'Nephrologist',
+  'nephrologist': 'Nephrologist',
+  'kidney doctor': 'Nephrologist',
+  'kidney specialist': 'Nephrologist',
+  'kidney': 'Nephrologist',
+
+  // Rheumatology
+  'rheumatology': 'Rheumatologist',
+  'rheumatologist': 'Rheumatologist',
+  'arthritis doctor': 'Rheumatologist',
+
+  // Surgery
+  'surgery': 'Surgeon',
+  'surgeon': 'Surgeon',
+
+  // ENT
+  'ent': 'Ent',
+  'ear nose throat': 'Ent',
+  'ear doctor': 'Ent',
+  'nose doctor': 'Ent',
+  'throat doctor': 'Ent',
+  'ear specialist': 'Ent',
+
+  // Dentistry
+  'dentistry': 'Dentist',
+  'dentist': 'Dentist',
+  'dental doctor': 'Dentist',
+  'teeth doctor': 'Dentist',
+  'tooth doctor': 'Dentist',
+  'teeth': 'Dentist',
+  'tooth': 'Dentist',
+
+  // General / Family Medicine
+  'general physician': 'General Physician',
+  'general': 'General Physician',
+  'physician': 'General Physician',
+  'family doctor': 'General Physician',
+  'gp': 'General Physician',
+  'general medicine': 'General Physician',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 2 — DATE / TIME PARSING (via chrono-node)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Converts a Date to YYYY-MM-DD string in local time */
 function toYMD(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -22,243 +180,233 @@ function toYMD(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-const DAY_MAP: Record<string, number> = {
-  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-  thursday: 4, friday: 5, saturday: 6,
-};
+/** Rounds minutes to nearest 30 and formats as "HH:MM AM/PM" */
+function formatSlotTime(d: Date): string {
+  let h = d.getHours();
+  const raw = d.getMinutes();
+  const m = raw < 15 ? 0 : raw < 45 ? 30 : 0;
+  if (raw >= 45) h += 1;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+}
 
+/**
+ * Parse a natural language date from the transcript using chrono-node.
+ * Returns YYYY-MM-DD or undefined.
+ */
 export function parseDate(text: string): string | undefined {
-  const lower = text.toLowerCase();
-
-  // "today"
-  if (/\btoday\b/.test(lower)) {
-    return toYMD(new Date());
-  }
-
-  // "tomorrow"
-  if (/\btomorrow\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return toYMD(d);
-  }
-
-  // "day after tomorrow"
-  if (/\bday after tomorrow\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    return toYMD(d);
-  }
-
-  // "next monday", "this friday", etc.
-  const dayMatch = lower.match(/\b(next|this)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
-  if (dayMatch) {
-    const modifier = dayMatch[1]; // "next" or "this"
-    const targetDay = DAY_MAP[dayMatch[2]];
-    const now = new Date();
-    const currentDay = now.getDay();
-    let diff = targetDay - currentDay;
-
-    if (modifier === 'next') {
-      if (diff <= 0) diff += 7;
-    } else {
-      // "this" — same week, but if today or past, go to next week
-      if (diff <= 0) diff += 7;
-    }
-
-    const d = new Date();
-    d.setDate(d.getDate() + diff);
-    return toYMD(d);
-  }
-
-  // Standalone day name: "monday", "friday"
-  const standaloneDayMatch = lower.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
-  if (standaloneDayMatch) {
-    const targetDay = DAY_MAP[standaloneDayMatch[1]];
-    const now = new Date();
-    const currentDay = now.getDay();
-    let diff = targetDay - currentDay;
-    if (diff <= 0) diff += 7;
-    const d = new Date();
-    d.setDate(d.getDate() + diff);
-    return toYMD(d);
-  }
-
-  return undefined;
+  const results = chrono.parse(text, new Date(), { forwardDate: true });
+  if (!results.length) return undefined;
+  const d = results[0].start.date();
+  return toYMD(d);
 }
 
-// ── Time Parsing ─────────────────────────────────────────────────────────────
-
+/**
+ * Parse a natural language time from the transcript using chrono-node.
+ * Returns "HH:MM AM/PM" or undefined.
+ */
 export function parseTime(text: string): string | undefined {
-  const lower = text.toLowerCase();
+  const results = chrono.parse(text, new Date(), { forwardDate: true });
+  if (!results.length) return undefined;
 
-  // "morning" → 09:00 AM
-  if (/\bmorning\b/.test(lower)) return '09:00 AM';
+  const comp = results[0].start;
+  // Only return a time if the user actually specified one (not just a date)
+  if (!comp.isCertain('hour')) return undefined;
 
-  // "afternoon" → 02:00 PM
-  if (/\bafternoon\b/.test(lower)) return '02:00 PM';
-
-  // "evening" → 05:00 PM
-  if (/\bevening\b/.test(lower)) return '05:00 PM';
-
-  // "5 pm", "5:30 pm", "05:00 PM"
-  const timeMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if (timeMatch) {
-    let h = parseInt(timeMatch[1], 10);
-    const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-    const ampm = timeMatch[3].toUpperCase();
-
-    // Round minutes to nearest 30
-    const roundedM = m < 15 ? 0 : m < 45 ? 30 : 0;
-    if (m >= 45) h += 1;
-
-    // Format to slot format
-    const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    const displayAmpm = ampm === 'PM' && h < 12 ? 'PM' : ampm === 'AM' && h >= 12 ? 'AM' : ampm;
-
-    return `${String(displayH).padStart(2, '0')}:${String(roundedM).padStart(2, '0')} ${displayAmpm}`;
-  }
-
-  // "17:00" (24-hour)
-  const time24Match = lower.match(/\b(\d{1,2}):(\d{2})\b/);
-  if (time24Match) {
-    let h = parseInt(time24Match[1], 10);
-    const m = parseInt(time24Match[2], 10);
-    if (h >= 0 && h <= 23) {
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-      const roundedM = m < 15 ? 0 : m < 45 ? 30 : 0;
-      return `${String(displayH).padStart(2, '0')}:${String(roundedM).padStart(2, '0')} ${ampm}`;
-    }
-  }
-
-  return undefined;
+  const d = comp.date();
+  return formatSlotTime(d);
 }
 
-// ── Entity Extraction ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 3 — DOCTOR NAME EXTRACTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Words that must NEVER appear inside a doctor's name */
+const NAME_STOP_WORDS = new Set([
+  'tomorrow', 'today', 'yesterday', 'morning', 'afternoon', 'evening', 'night',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  'january', 'february', 'march', 'april', 'may', 'june', 'july',
+  'august', 'september', 'october', 'november', 'december',
+  'next', 'this', 'last', 'on', 'at', 'in', 'by', 'for', 'from', 'with', 'the',
+  'am', 'pm', 'a.m', 'p.m',
+  'appointment', 'please', 'want', 'wanna', 'need', 'book', 'schedule',
+  'visit', 'see', 'check', 'find', 'nearest', 'available', 'day', 'date',
+  'time', 'hospital', 'clinic', 'and', 'or', 'a', 'an',
+]);
+
+/**
+ * Walk the raw-capture token by token, stopping at the first stop-word or digit.
+ * Returns at most a 2-token name (First Last).
+ */
+function safeNameTokens(raw: string): string {
+  const tokens = raw.trim().split(/\s+/);
+  const kept: string[] = [];
+  for (const tok of tokens) {
+    if (NAME_STOP_WORDS.has(tok.toLowerCase())) break;
+    if (/^\d/.test(tok)) break;
+    // Skip very short "words" that are likely mis-heard conjunctions
+    if (tok.length < 2) break;
+    kept.push(tok);
+    if (kept.length === 2) break;
+  }
+  return kept.join(' ').trim();
+}
 
 export function extractDoctor(text: string): string | undefined {
-  // Match: "Dr. Ravi", "Dr Ravi Kumar", "Doctor Ravi", "with Dr. Ravi"
-  const match = text.match(/\b(?:dr\.?|doctor)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i);
-  if (match) return match[1].trim();
+  // 1. "Dr." / "Doctor" prefix — highest confidence
+  const drMatch = text.match(/\b(?:dr\.?|doctor)\s+([a-zA-Z].+)/i);
+  if (drMatch) {
+    const name = safeNameTokens(drMatch[1]);
+    if (name) return name;
+  }
 
-  // Match: "with Ravi" (after "appointment with")
-  const withMatch = text.match(/\bwith\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/);
-  if (withMatch) return withMatch[1].trim();
+  // 2. "see / visit / consult / meet (Dr?) <Name>"
+  const seeMatch = text.match(
+    /\b(?:see|visit|consult|meet|wanna\s+see|want\s+to\s+see)\s+(?:dr\.?\s*)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/
+  );
+  if (seeMatch) {
+    const name = safeNameTokens(seeMatch[1]);
+    if (name) return name;
+  }
 
-  return undefined;
-}
+  // 3. "appointment with <Name>"
+  const withMatch = text.match(/\bappointment\s+with\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+  if (withMatch) {
+    const name = safeNameTokens(withMatch[1]);
+    if (name) return name;
+  }
 
-export function extractHospital(text: string): string | undefined {
-  // "at Apollo", "at Apollo Hospital", "at Apollo Hospitals", "in Fortis"
-  const match = text.match(/\b(?:at|in)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*?)(?:\s+(?:hospital|hospitals|clinic|centre|center))?\s*(?:$|tomorrow|today|on|at\s+\d)/i);
-  if (match) {
-    const raw = match[1].trim();
-    // Filter out time/date words
-    const stopWords = ['tomorrow', 'today', 'morning', 'afternoon', 'evening', 'next', 'this'];
-    if (stopWords.includes(raw.toLowerCase())) return undefined;
-    return raw;
+  // 4. Bare "with <ProperNoun>" fallback
+  const bareWithMatch = text.match(/\bwith\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/);
+  if (bareWithMatch) {
+    const name = safeNameTokens(bareWithMatch[1]);
+    if (name) return name;
   }
 
   return undefined;
 }
 
-export function extractSpecialty(text: string): string | undefined {
-  const SPECIALTIES = [
-    'cardiologist', 'dermatologist', 'neurologist', 'orthopedic',
-    'pediatrician', 'psychiatrist', 'ophthalmologist', 'gynecologist',
-    'urologist', 'oncologist', 'endocrinologist', 'gastroenterologist',
-    'pulmonologist', 'nephrologist', 'rheumatologist', 'surgeon',
-    'general physician', 'general', 'ent', 'dentist',
-  ];
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 4 — SPECIALTY EXTRACTION
+// ─────────────────────────────────────────────────────────────────────────────
 
+export function extractSpecialty(text: string): string | undefined {
   const lower = text.toLowerCase();
 
-  for (const spec of SPECIALTIES) {
-    // Match plural forms too: "cardiologists"
-    if (lower.includes(spec) || lower.includes(spec + 's')) {
-      // Return singular form, title-cased
-      return spec.charAt(0).toUpperCase() + spec.slice(1);
+  // Try multi-word phrases first (longest match wins)
+  const sortedKeys = Object.keys(SPECIALTY_MAP).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (lower.includes(key)) {
+      return SPECIALTY_MAP[key];
     }
   }
 
-  // "heart doctor" → Cardiologist
-  const synonyms: Record<string, string> = {
-    'heart': 'Cardiologist',
-    'skin': 'Dermatologist',
-    'brain': 'Neurologist',
-    'bone': 'Orthopedic',
-    'child': 'Pediatrician',
-    'children': 'Pediatrician',
-    'eye': 'Ophthalmologist',
-    'stomach': 'Gastroenterologist',
-    'lung': 'Pulmonologist',
-    'kidney': 'Nephrologist',
-    'cancer': 'Oncologist',
-    'teeth': 'Dentist',
-    'tooth': 'Dentist',
-    'ear': 'Ent',
-    'nose': 'Ent',
-    'throat': 'Ent',
-  };
-
-  for (const [keyword, specialty] of Object.entries(synonyms)) {
-    if (lower.includes(keyword)) return specialty;
-  }
-
   return undefined;
 }
 
-// ── Main Intent Parser ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 5 — HOSPITAL EXTRACTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function extractHospital(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  const match = text.match(
+    /\b(?:at|in)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*?)(?:\s+(?:hospital|hospitals|clinic|centre|center))?\s*(?:$|tomorrow|today|on|at\s+\d)/i
+  );
+  if (match) {
+    const raw = match[1].trim();
+    // Filter out known stop-words
+    if (NAME_STOP_WORDS.has(raw.toLowerCase())) return undefined;
+    // Filter out known specialty names
+    if (extractSpecialty(raw)) return undefined;
+    return raw;
+  }
+  return undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 6 — INTENT DETECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Patterns for the find_nearest intent */
+const NEAREST_PATTERNS = [
+  /\bnearest\b/,
+  /\bnearby\b/,
+  /\bnear\s+me\b/,
+  /\bclosest\b/,
+  /\bfind\s+(?:a\s+)?nearby\b/,
+  /\bnear\s+(?:my\s+)?(?:location|place|area)\b/,
+];
+
+/** Patterns for the search_specialty intent */
+const SPECIALTY_SEARCH_PATTERNS = [
+  /\bwho\s+(?:are|is)\b/,
+  /\bavailable\s+\w+ists?\b/,
+  /\bshow\s+(?:me\s+)?(?:all\s+)?\w+ists?\b/,
+  /\bfind\s+(?:me\s+)?(?:a\s+)?\w+ist\b/,
+  /\blist\s+\w+ists?\b/,
+  /\bsearch\s+(?:for\s+)?(?:a\s+)?\w+ist\b/,
+];
+
+/** Patterns for the book intent */
+const BOOK_PATTERNS = [
+  /\bbook\b/,
+  /\bappointment\b/,
+  /\bschedule\b/,
+  /\bi\s+want\b/,
+  /\bi\s+need\b/,
+  /\bwanna\b/,
+  /\bsee\s+(?:a\s+)?(?:dr\.?|doctor)?\s*[A-Z]/i,
+  /\bvisit\b/,
+  /\bconsult\b/,
+  /\bmeet\b/,
+];
+
+/** Patterns for availability check */
+const AVAILABILITY_PATTERNS = [
+  /\b(?:check|is)\s+.*\bavailable\b/,
+  /\bavailability\b/,
+  /\bcheck\s+slot\b/,
+  /\bcheck\s+timing\b/,
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PART 7 — MAIN PARSER
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function parseVoiceIntent(transcript: string): VoiceIntent {
   const lower = transcript.toLowerCase().trim();
 
-  // ── Yes/No confirmation ──
-  if (/^(yes|yeah|yep|sure|confirm|book it|go ahead|okay|ok)\b/.test(lower)) {
+  // ── Yes / No confirmation ──
+  if (/^(yes|yeah|yep|sure|confirm|book it|go ahead|okay|ok|please|do it)\b/.test(lower)) {
     return { type: 'confirm_yes' };
   }
-  if (/^(no|nope|cancel|never mind|stop)\b/.test(lower)) {
+  if (/^(no|nope|cancel|never mind|stop|don't|dont)\b/.test(lower)) {
     return { type: 'confirm_no' };
   }
 
-  // ── Find nearest: "find nearest cardiologist", "nearest dermatologist near me", "nearby dentists" ──
-  const isFindNearest =
-    /\bnearest\b/.test(lower) ||
-    /\bnearby\b/.test(lower) ||
-    /\bnear\s+me\b/.test(lower) ||
-    /\bclosest\b/.test(lower) ||
-    /\bfind\s+(?:a\s+)?nearby\b/.test(lower);
-
-  if (isFindNearest) {
+  // ── Find nearest (location-based) ──
+  const isNearest = NEAREST_PATTERNS.some(p => p.test(lower));
+  if (isNearest) {
     const specialty = extractSpecialty(transcript);
     if (specialty) {
-      const hospital = extractHospital(transcript);
-      return { type: 'find_nearest', specialty, hospital };
+      return { type: 'find_nearest', specialty, hospital: extractHospital(transcript) };
     }
   }
 
-  // ── Specialty search: "who are the cardiologists", "available cardiologists" ──
-  const isSpecialtySearch =
-    /\bwho\s+(?:are|is)\b/.test(lower) ||
-    /\bavailable\s+\w+ists?\b/.test(lower) ||
-    /\bshow\s+(?:me\s+)?(?:all\s+)?\w+ists?\b/.test(lower) ||
-    /\bfind\s+(?:me\s+)?(?:a\s+)?\w+ist\b/.test(lower) ||
-    /\blist\s+\w+ists?\b/.test(lower);
-
+  // ── Specialty search (non-location) ──
+  const isSpecialtySearch = SPECIALTY_SEARCH_PATTERNS.some(p => p.test(lower));
   if (isSpecialtySearch) {
     const specialty = extractSpecialty(transcript);
     if (specialty) {
-      const hospital = extractHospital(transcript);
-      return { type: 'search_specialty', specialty, hospital };
+      return { type: 'search_specialty', specialty, hospital: extractHospital(transcript) };
     }
   }
 
-  // ── Availability check: "check if Dr X is available", "is Dr X available" ──
-  const isAvailabilityCheck =
-    /\b(?:check|is)\s+.*\bavailable\b/.test(lower) ||
-    /\bavailability\b/.test(lower);
-
-  if (isAvailabilityCheck) {
+  // ── Availability check ──
+  const isAvailability = AVAILABILITY_PATTERNS.some(p => p.test(lower));
+  if (isAvailability) {
     const doctor = extractDoctor(transcript);
     if (doctor) {
       return {
@@ -271,24 +419,26 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
   }
 
   // ── Booking intent ──
-  const isBookingIntent =
-    /\bbook\b/.test(lower) ||
-    /\bappointment\b/.test(lower) ||
-    /\bschedule\b/.test(lower) ||
-    /\bi want\b/.test(lower) ||
-    /\bi need\b/.test(lower);
+  const isBooking = BOOK_PATTERNS.some(p => p.test(lower));
+  if (isBooking) {
+    // If no doctor name detected but a specialty is, treat as specialty search
+    const doctor = extractDoctor(transcript);
+    const specialty = extractSpecialty(transcript);
 
-  if (isBookingIntent) {
+    if (!doctor && specialty) {
+      return { type: 'search_specialty', specialty, hospital: extractHospital(transcript) };
+    }
+
     return {
       type: 'book',
-      doctor: extractDoctor(transcript),
+      doctor,
       hospital: extractHospital(transcript),
       date: parseDate(transcript),
       time: parseTime(transcript),
     };
   }
 
-  // ── Fallback: if doctor name detected, assume booking ──
+  // ── Fallback: doctor name detected → assume booking ──
   const doctor = extractDoctor(transcript);
   if (doctor) {
     return {
@@ -298,6 +448,12 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
       date: parseDate(transcript),
       time: parseTime(transcript),
     };
+  }
+
+  // ── Fallback: specialty detected → specialty search ──
+  const specialty = extractSpecialty(transcript);
+  if (specialty) {
+    return { type: 'search_specialty', specialty, hospital: extractHospital(transcript) };
   }
 
   return { type: 'unknown' };

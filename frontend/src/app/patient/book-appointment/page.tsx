@@ -179,7 +179,7 @@ function BookAppointmentContent() {
 
   // ── Fetch all doctors from DB ──
   useEffect(() => {
-    fetch("http://localhost:8000/api/doctor/all")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/doctor/all`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setDoctors(data);
@@ -196,7 +196,7 @@ function BookAppointmentContent() {
       return;
     }
     setAvailLoading(true);
-    fetch(`http://localhost:8000/api/doctor/slots?doctorId=${selectedDoctor.doctorId}&date=${form.date}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/doctor/slots?doctorId=${selectedDoctor.doctorId}&date=${form.date}`)
       .then(r => r.json())
       .then(data => {
         setDateFullyBlocked(!!data.blocked);
@@ -303,7 +303,7 @@ function BookAppointmentContent() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/appointments", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

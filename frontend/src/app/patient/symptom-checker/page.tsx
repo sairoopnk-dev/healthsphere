@@ -238,7 +238,7 @@ export default function SymptomCheckerPage() {
     setQuestions([]);
     setAnswers({});
     try {
-      const res = await fetch("http://localhost:8000/api/symptom-checker/generate-questions", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/symptom-checker/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptoms }),
@@ -266,7 +266,7 @@ export default function SymptomCheckerPage() {
         : questions.map((q, i) => ({ question: q, answer: answers[i] || "" })).filter(a => a.answer.trim()),
     };
     try {
-      const res = await fetch("http://localhost:8000/api/symptom-checker/hybrid-predict", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/symptom-checker/hybrid-predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -290,7 +290,7 @@ export default function SymptomCheckerPage() {
     setDoctorMatch(null);
     setMatchError("");
     try {
-      const res = await fetch("http://localhost:8000/api/ai/match-doctor", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/match-doctor`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptoms }),

@@ -50,7 +50,7 @@ export default function RegisterPage() {
       role: storedRole,
     };
 
-    const res = await fetch(`http://localhost:8000/api/auth/${storedRole}/register`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -103,7 +103,7 @@ export default function RegisterPage() {
         contactNumber: formData.contactNumber,
       };
 
-      const res = await fetch(`http://localhost:8000/api/auth/${role}/register`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${role}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -146,7 +146,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col md:flex-row items-center justify-start md:justify-center py-12 px-4 md:p-6 relative overflow-x-hidden overflow-y-auto">
       {/* Background blobs */}
       <div className="absolute top-[-15%] right-[-10%] w-[55%] h-[55%] bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-15%] left-[-10%] w-[55%] h-[55%] bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />

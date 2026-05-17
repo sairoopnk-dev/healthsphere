@@ -34,7 +34,7 @@ export const generateDietPlan = async (req: Request, res: Response): Promise<voi
     const { patientId } = req.params;
     const { dietType, allergies, goal, useSymptoms } = req.body;
 
-    console.log("Incoming request:", req.body);
+
 
     if (!dietType) {
       res.status(400).json({ success: false, message: 'dietType is required.' });
@@ -71,7 +71,7 @@ export const generateDietPlan = async (req: Request, res: Response): Promise<voi
     }
 
     // Call AI generator
-    console.log("Calling Gemini API...", useSymptoms ? `(symptom-based: ${symptomContext.join(', ')})` : '(general mode)');
+
     const result = await generateDietPlanAI({
       height: patient.height,
       weight: patient.weight,

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useDoctor } from "../_context/DoctorContext";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const LIBRARIES: ("places")[] = ["places"];
 const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bengaluru
@@ -215,7 +215,6 @@ export default function SetupHospitalPage() {
       const res = await fetch(`${API}/api/hospital/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         credentials: "include",
         body: JSON.stringify({
           name: state.name,

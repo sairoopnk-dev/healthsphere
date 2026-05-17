@@ -78,7 +78,7 @@ export default function PatientSetupProfile() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/api/patients/${patientId}/setup`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/setup`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

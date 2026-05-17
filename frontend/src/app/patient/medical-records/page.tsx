@@ -111,7 +111,7 @@ function UploadRecordModal({ patientId, onClose, onSuccess }: UploadModalProps) 
       fd.append("recordType", recordType);
       fd.append("file",       file);
 
-      const res  = await fetch("http://localhost:8000/api/medical-records/patient-upload", {
+      const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/medical-records/patient-upload`, {
         method: "POST",
         body: fd,
       });
@@ -521,10 +521,10 @@ export default function PatientMedicalRecords() {
     setIsDeleting(true);
     try {
       if (ids.length === 1) {
-        const res = await fetch(`http://localhost:8000/api/medical-records/${ids[0]}`, { method: "DELETE" });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/medical-records/${ids[0]}`, { method: "DELETE" });
         if (!res.ok) throw new Error("Delete failed");
       } else {
-        const res = await fetch("http://localhost:8000/api/medical-records/bulk", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/medical-records/bulk`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids }),

@@ -20,7 +20,7 @@ export const createRecord = async (req: Request, res: Response): Promise<void> =
 
     const files = (req as any).files as Express.Multer.File[] | undefined;
     const attachments = files
-      ? files.map((f) => `http://localhost:5000/uploads/${f.filename}`)
+      ? files.map((f) => `${process.env.BASE_URL || 'http://localhost:8000'}/uploads/${f.filename}`)
       : (req.body.attachments
           ? (Array.isArray(req.body.attachments) ? req.body.attachments : [req.body.attachments])
           : []);
@@ -174,7 +174,7 @@ export const uploadOwnRecord = async (req: Request, res: Response): Promise<void
     }
 
     const file = (req as any).file as Express.Multer.File | undefined;
-    const fileUrl = file ? `http://localhost:5000/uploads/${file.filename}` : undefined;
+    const fileUrl = file ? `${process.env.BASE_URL || 'http://localhost:8000'}/uploads/${file.filename}` : undefined;
 
     const originalName = file ? file.originalname : 'Unknown file';
     const ext          = file ? path.extname(file.originalname).toLowerCase() : '';
