@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import Patient from '../models/Patient';
 import Doctor from '../models/Doctor';
+import mongoose from 'mongoose';
 import generateToken from '../utils/generateToken';
 
 // ── DOCTOR ID GENERATION (bounded retry) ────────────────────────────────────
@@ -19,14 +20,25 @@ async function generateUniqueDoctorId(): Promise<string> {
 
 export const registerPatient = async (req: Request, res: Response): Promise<void> => {
   try {
+<<<<<<< HEAD
     const { name, email, password, contactNumber, provider } = req.body;
+=======
+    let { name, email, password, contactNumber } = req.body;
+
+    console.log("Connected DB:", mongoose.connection.name);
+    console.log("URI:", process.env.MONGO_URI || process.env.MONGODB_URI);
+>>>>>>> e99a2254380b0b7c489a4dafce2587f34883550f
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
       return;
     }
 
+    email = email.toLowerCase().trim();
+    console.log("Incoming email:", email);
+
     const patientExists = await Patient.findOne({ email });
+<<<<<<< HEAD
     if (patientExists) {
       if (provider === 'google') {
         if (!patientExists.providers.includes('google')) {
@@ -37,6 +49,12 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
         return;
       }
       res.status(400).json({ message: 'Account already exists' });
+=======
+    console.log("Existing user:", patientExists);
+
+    if (patientExists) {
+      res.status(400).json({ message: 'User already exists' });
+>>>>>>> e99a2254380b0b7c489a4dafce2587f34883550f
       return;
     }
 
@@ -71,14 +89,25 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
 
 export const registerDoctor = async (req: Request, res: Response): Promise<void> => {
   try {
+<<<<<<< HEAD
     const { name, email, password, contactNumber, provider } = req.body;
+=======
+    let { name, email, password, contactNumber } = req.body;
+
+    console.log("Connected DB:", mongoose.connection.name);
+    console.log("URI:", process.env.MONGO_URI || process.env.MONGODB_URI);
+>>>>>>> e99a2254380b0b7c489a4dafce2587f34883550f
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
       return;
     }
 
+    email = email.toLowerCase().trim();
+    console.log("Incoming email:", email);
+
     const doctorExists = await Doctor.findOne({ email });
+<<<<<<< HEAD
     if (doctorExists) {
       if (provider === 'google') {
         if (!doctorExists.providers.includes('google')) {
@@ -89,6 +118,12 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
         return;
       }
       res.status(400).json({ message: 'Account already exists' });
+=======
+    console.log("Existing user:", doctorExists);
+
+    if (doctorExists) {
+      res.status(400).json({ message: 'User already exists' });
+>>>>>>> e99a2254380b0b7c489a4dafce2587f34883550f
       return;
     }
 
@@ -123,7 +158,15 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
+<<<<<<< HEAD
     const { email, password, role, provider } = req.body;
+=======
+    let { email, password, role } = req.body;
+
+    if (email) {
+      email = email.toLowerCase().trim();
+    }
+>>>>>>> e99a2254380b0b7c489a4dafce2587f34883550f
 
     let user: any = null;
     if (role === 'doctor') {

@@ -35,6 +35,8 @@ import LoginNavbar from "./_components/LoginNavbar";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
 
 /* ─── health facts data ─── */
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 const healthFacts = [
   {
     icon: Droplets,
@@ -271,7 +273,7 @@ export default function LoginPage() {
 
   const processGoogleLoginResult = async (result: any) => {
     const storedRole = localStorage.getItem("pendingGoogleRole") || role;
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
+    await fetch(`${apiUrl}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
@@ -283,7 +285,7 @@ export default function LoginPage() {
         provider: "google",
       }),
     });
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+    const res = await fetch(`${apiUrl}/api/auth/login`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ email: result.user.email, password: "google_login_dummy_password", role: storedRole, provider: "google" }),
@@ -333,7 +335,7 @@ export default function LoginPage() {
     setLoading(true); setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+      const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, password, role }),
