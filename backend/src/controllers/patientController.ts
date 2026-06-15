@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Patient from '../models/Patient';
 import MedicalRecord from '../models/MedicalRecord';
 import Appointment from '../models/Appointment';
+import bcrypt from 'bcryptjs';
 
 // ── GET Dashboard ────────────────────────────────────────────────────────────
 export const getPatientDashboard = async (req: Request, res: Response): Promise<void> => {
@@ -28,7 +29,7 @@ export const getPatientDashboard = async (req: Request, res: Response): Promise<
 export const setupPatientProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const { patientId } = req.params;
-    const { dob, gender, height, weight, bloodGroup, emergencyContact } = req.body;
+    const { dob, gender, height, weight, bloodGroup, emergencyContact, name, password } = req.body;
 
     // Validate mandatory fields
     if (!dob || !gender || !emergencyContact?.name || !emergencyContact?.phone) {
@@ -36,19 +37,33 @@ export const setupPatientProfile = async (req: Request, res: Response): Promise<
       return;
     }
 
+    const updateData: any = {
+      dob,
+      gender,
+      height:   height   ? Number(height)   : undefined,
+      weight:   weight   ? Number(weight)    : undefined,
+      bloodGroup: bloodGroup || '',
+      emergencyContact: {
+        name:  emergencyContact.name,
+        phone: emergencyContact.phone,
+      },
+      isProfileCompleted: true,
+    };
+
+    if (name) updateData.name = name;
+    
+    let addToSet: any = {};
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(password, salt);
+      addToSet.providers = 'email';
+    }
+
     const patient = await Patient.findOneAndUpdate(
       { patientId },
-      {
-        dob,
-        gender,
-        height:   height   ? Number(height)   : undefined,
-        weight:   weight   ? Number(weight)    : undefined,
-        bloodGroup: bloodGroup || '',
-        emergencyContact: {
-          name:  emergencyContact.name,
-          phone: emergencyContact.phone,
-        },
-        isProfileCompleted: true,
+      { 
+        $set: updateData,
+        ...(Object.keys(addToSet).length > 0 ? { $addToSet: addToSet } : {})
       },
       { new: true }
     ).select('-passwordHash');

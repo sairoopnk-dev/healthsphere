@@ -6,6 +6,7 @@ export interface IDoctor extends Document {
   email: string;
   passwordHash: string;
   contactNumber: string;
+  providers: string[];
 
   // Profile setup fields (filled on first login)
   isProfileCompleted: boolean;
@@ -32,6 +33,7 @@ const DoctorSchema: Schema = new Schema(
     email:         { type: String, required: true, unique: true },
     passwordHash:  { type: String, required: true },
     contactNumber: { type: String, required: true },
+    providers:     { type: [String], default: ['email'] },
 
     isProfileCompleted: { type: Boolean, default: false },
     specialization: { type: String, default: '' },

@@ -17,10 +17,9 @@ async function generateUniqueDoctorId(): Promise<string> {
   throw new Error('Doctor ID generation failed');
 }
 
-// ── PATIENT REGISTER (minimal – profile completed later) ────────────────────
 export const registerPatient = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, contactNumber } = req.body;
+    const { name, email, password, contactNumber, provider } = req.body;
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
@@ -28,13 +27,27 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
     }
 
     const patientExists = await Patient.findOne({ email });
-    if (patientExists) { res.status(400).json({ message: 'Patient already exists' }); return; }
+    if (patientExists) {
+      if (provider === 'google') {
+        if (!patientExists.providers.includes('google')) {
+          patientExists.providers.push('google');
+          await patientExists.save();
+        }
+        res.status(200).json({ message: 'Linked google account' });
+        return;
+      }
+      res.status(400).json({ message: 'Account already exists' });
+      return;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const patientId = `PID-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    const patient = await Patient.create({ patientId, name, email, passwordHash, contactNumber });
+    const patient = await Patient.create({ 
+      patientId, name, email, passwordHash, contactNumber,
+      providers: provider === 'google' ? ['google'] : ['email']
+    });
 
     if (patient) {
       generateToken(res, patient._id as unknown as string, 'patient');
@@ -44,7 +57,8 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
         name: patient.name,
         email: patient.email,
         role: 'patient',
-        isProfileCompleted: false,  // <-- first-login flag
+        isProfileCompleted: false,
+        providers: patient.providers,
       });
     } else {
       res.status(400).json({ message: 'Invalid patient data' });
@@ -55,10 +69,9 @@ export const registerPatient = async (req: Request, res: Response): Promise<void
   }
 };
 
-// ── DOCTOR REGISTER (minimal – profile completed later) ─────────────────────
 export const registerDoctor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, contactNumber } = req.body;
+    const { name, email, password, contactNumber, provider } = req.body;
 
     if (!name || !email || !password || !contactNumber) {
       res.status(400).json({ message: 'Name, email, password and contact are required.' });
@@ -66,14 +79,26 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
     }
 
     const doctorExists = await Doctor.findOne({ email });
-    if (doctorExists) { res.status(400).json({ message: 'Doctor already exists' }); return; }
+    if (doctorExists) {
+      if (provider === 'google') {
+        if (!doctorExists.providers.includes('google')) {
+          doctorExists.providers.push('google');
+          await doctorExists.save();
+        }
+        res.status(200).json({ message: 'Linked google account' });
+        return;
+      }
+      res.status(400).json({ message: 'Account already exists' });
+      return;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const doctorId = await generateUniqueDoctorId();
 
     const doctor = await Doctor.create({
-      doctorId, name, email, passwordHash, contactNumber, blockedDates: []
+      doctorId, name, email, passwordHash, contactNumber, blockedDates: [],
+      providers: provider === 'google' ? ['google'] : ['email']
     });
 
     if (doctor) {
@@ -84,7 +109,8 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
         name: doctor.name,
         email: doctor.email,
         role: 'doctor',
-        isProfileCompleted: false,  // <-- first-login flag
+        isProfileCompleted: false,
+        providers: doctor.providers,
       });
     } else {
       res.status(400).json({ message: 'Invalid doctor data' });
@@ -95,10 +121,9 @@ export const registerDoctor = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// ── LOGIN ────────────────────────────────────────────────────────────────────
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, provider } = req.body;
 
     let user: any = null;
     if (role === 'doctor') {
@@ -107,7 +132,20 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       user = await Patient.findOne({ email });
     }
 
-    if (user && (await bcrypt.compare(password, user.passwordHash))) {
+    let isValidPassword = false;
+    if (user) {
+      if (provider === 'google') {
+        isValidPassword = true;
+        if (!user.providers.includes('google')) {
+          user.providers.push('google');
+          await user.save();
+        }
+      } else {
+        isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      }
+    }
+
+    if (user && isValidPassword) {
       generateToken(res, user._id as unknown as string, role);
       const baseResponse: Record<string, unknown> = {
         _id: user._id,
@@ -115,7 +153,8 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         email: user.email,
         role,
-        isProfileCompleted: user.isProfileCompleted ?? false,  // <-- tells frontend where to redirect
+        isProfileCompleted: user.isProfileCompleted ?? false,
+        providers: user.providers || ['email'],
       };
       // Additive doctor-only fields (Req 3.1, 11.5). Omitted entirely for
       // patients so the patient login response stays byte-for-byte identical.

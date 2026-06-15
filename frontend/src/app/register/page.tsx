@@ -49,20 +49,31 @@ export default function RegisterPage() {
       password: "google_login_dummy_password", 
       contactNumber: "0000000000",
       role: storedRole,
+      provider: "google",
     };
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/${storedRole}/register`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+    });
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: result.user.email, password: "google_login_dummy_password", role: storedRole, provider: "google" }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Registration failed");
 
     localStorage.setItem("user", JSON.stringify({ ...data, role: storedRole }));
+    if (result.user.email) localStorage.setItem("userEmail", result.user.email);
+    if (data.name) localStorage.setItem("userName", data.name);
     localStorage.setItem("isLoggedIn", "true");
     localStorage.removeItem("pendingGoogleRole");
 
-    router.push(`/${storedRole}/setup-profile`);
+    if (!data.isProfileCompleted) router.push(`/${storedRole}/setup-profile`);
+    else if (storedRole === "doctor" && data.hospitalId == null) router.push("/doctor/setup-hospital");
+    else if (storedRole === "patient") router.push("/patient/overview");
+    else router.push("/doctor/overview");
   };
 
   const handleGoogleSignup = async () => {

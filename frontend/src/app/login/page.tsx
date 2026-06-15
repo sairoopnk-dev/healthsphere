@@ -280,12 +280,13 @@ export default function LoginPage() {
         password: "google_login_dummy_password",
         contactNumber: "0000000000",
         role: storedRole,
+        provider: "google",
       }),
     });
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ email: result.user.email, password: "google_login_dummy_password", role: storedRole }),
+      body: JSON.stringify({ email: result.user.email, password: "google_login_dummy_password", role: storedRole, provider: "google" }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Google Login failed");

@@ -3,6 +3,7 @@ import Patient from '../models/Patient';
 import Doctor from '../models/Doctor';
 import Appointment from '../models/Appointment';
 import MedicalRecord from '../models/MedicalRecord';
+import bcrypt from 'bcryptjs';
 import { sendOTP } from '../utils/sendOTP';
 import { getRecentSymptoms } from '../services/insightEngine';
 import Interaction from '../models/Interaction';
@@ -403,23 +404,37 @@ export const addPatientRecord = async (req: Request, res: Response): Promise<voi
 export const setupDoctorProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const { doctorId } = req.params;
-    const { specialization, hospital, qualification, designation, experience, gender } = req.body;
+    const { specialization, hospital, qualification, designation, experience, gender, name, password } = req.body;
 
     if (!specialization || !hospital || !qualification || !designation || !experience || !gender) {
       res.status(400).json({ message: 'All fields are required for profile setup.' });
       return;
     }
 
+    const updateData: any = {
+      specialization,
+      hospital,
+      qualification,
+      designation,
+      experience: Number(experience),
+      gender,
+      isProfileCompleted: true,
+    };
+
+    if (name) updateData.name = name;
+    
+    let addToSet: any = {};
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(password, salt);
+      addToSet.providers = 'email';
+    }
+
     const doctor = await Doctor.findOneAndUpdate(
       { doctorId },
-      {
-        specialization,
-        hospital,
-        qualification,
-        designation,
-        experience: Number(experience),
-        gender,
-        isProfileCompleted: true,
+      { 
+        $set: updateData,
+        ...(Object.keys(addToSet).length > 0 ? { $addToSet: addToSet } : {})
       },
       { new: true }
     ).select('-passwordHash');

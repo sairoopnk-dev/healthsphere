@@ -31,8 +31,11 @@ export default function PatientSetupProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [patientId, setPatientId] = useState("");
+  const [isGoogleOnly, setIsGoogleOnly] = useState(false);
 
   // form fields
+  const [name, setName]     = useState("");
+  const [password, setPassword] = useState("");
   const [dob, setDob]       = useState("");
   const [gender, setGender] = useState("");
   const [height, setHeight] = useState("");
@@ -52,17 +55,24 @@ export default function PatientSetupProfile() {
     // If already completed, skip to dashboard
     if (user.isProfileCompleted) { router.push("/patient/overview"); return; }
     setPatientId(user.id || user.patientId);
+    
+    if (user.providers?.includes("google") && !user.providers?.includes("email")) {
+      setIsGoogleOnly(true);
+      if (user.name && user.name !== "Google User") {
+        setName(user.name);
+      }
+    }
   }, [router]);
 
   // ── Step validation ──────────────────────────────────────────────────────────
-  const canProceedStep0 = dob && gender;
+  const canProceedStep0 = dob && gender && (!isGoogleOnly || (name.trim() && password.trim().length >= 6));
   const canProceedStep1 = true; // All optional in step 1
   const canSubmit = ecName.trim() && ecPhone.trim();
 
   const nextStep = () => {
     setError("");
     if (step === 0 && !canProceedStep0) {
-      setError("Date of Birth and Gender are required.");
+      setError("Please fill all required fields correctly (Password must be 6+ chars).");
       return;
     }
     setStep(s => s + 1);
@@ -88,6 +98,7 @@ export default function PatientSetupProfile() {
           weight:   weight ? Number(weight) : undefined,
           bloodGroup,
           emergencyContact: { name: ecName.trim(), phone: ecPhone.trim() },
+          ...(isGoogleOnly ? { name: name.trim(), password } : {})
         }),
       });
       const data = await res.json();
@@ -170,6 +181,27 @@ export default function PatientSetupProfile() {
                       <p className="text-slate-400 text-xs">Your DOB will be used to calculate your age automatically.</p>
                     </div>
                   </div>
+
+                  {isGoogleOnly && (
+                    <>
+                      <div>
+                        <label className={labelCls}>Full Name <span className="text-red-400">*</span></label>
+                        <input
+                          type="text" value={name} onChange={e => setName(e.target.value)} required
+                          placeholder="Your Custom Name"
+                          className={`${inputCls} px-4`}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Set Password <span className="text-red-400">*</span></label>
+                        <input
+                          type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                          placeholder="••••••••"
+                          className={`${inputCls} px-4`}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className={labelCls}>

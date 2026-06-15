@@ -23,8 +23,11 @@ export default function DoctorSetupProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [doctorId, setDoctorId] = useState("");
+  const [isGoogleOnly, setIsGoogleOnly] = useState(false);
 
   // form fields
+  const [name, setName]                     = useState("");
+  const [password, setPassword]             = useState("");
   const [specialization, setSpecialization] = useState("");
   const [customSpec, setCustomSpec]         = useState("");
   const [hospital, setHospital]             = useState("");
@@ -43,6 +46,13 @@ export default function DoctorSetupProfile() {
     if (user.role !== "doctor") { router.push("/login"); return; }
     if (user.isProfileCompleted) { router.push("/doctor/overview"); return; }
     setDoctorId(user.id || user.doctorId);
+
+    if (user.providers?.includes("google") && !user.providers?.includes("email")) {
+      setIsGoogleOnly(true);
+      if (user.name && user.name !== "Google User") {
+        setName(user.name);
+      }
+    }
   }, [router]);
 
   // ── Validation per step ──────────────────────────────────────────────────────
@@ -59,7 +69,10 @@ export default function DoctorSetupProfile() {
   // ── Submit ────────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gender) { setError("Please select your gender."); return; }
+    if (!gender || (isGoogleOnly && (!name.trim() || password.trim().length < 6))) {
+      setError("Please fill all required fields correctly (Password must be 6+ chars).");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -73,6 +86,7 @@ export default function DoctorSetupProfile() {
           designation:    designation.trim(),
           experience:     Number(experience),
           gender,
+          ...(isGoogleOnly ? { name: name.trim(), password } : {})
         }),
       });
       const data = await res.json();
@@ -276,6 +290,27 @@ export default function DoctorSetupProfile() {
                       <p className="text-slate-400 text-xs">Last step! Almost done.</p>
                     </div>
                   </div>
+
+                  {isGoogleOnly && (
+                    <>
+                      <div>
+                        <label className={labelCls}>Full Name <span className="text-red-400">*</span></label>
+                        <input
+                          type="text" value={name} onChange={e => setName(e.target.value)} required
+                          placeholder="Your Custom Name"
+                          className={`${inputCls} px-4`}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Set Password <span className="text-red-400">*</span></label>
+                        <input
+                          type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                          placeholder="••••••••"
+                          className={`${inputCls} px-4`}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className={labelCls}>Gender <span className="text-red-400">*</span></label>
